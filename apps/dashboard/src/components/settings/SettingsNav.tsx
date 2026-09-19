@@ -7,6 +7,7 @@ import {
   Sliders, 
   Bot, 
   BookOpen, 
+  ImageIcon,
   MessageSquare, 
   Users, 
   ShieldCheck, 
@@ -41,6 +42,13 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     label: 'قاعدة المعرفة والزاحف',
     subLabel: 'Knowledge & Crawlers',
     icon: BookOpen,
+  },
+  {
+    href: '/settings/media',
+    label: 'مكتبة الوسائط والكتالوج',
+    subLabel: 'Visual Assets & Catalog',
+    icon: ImageIcon,
+    badge: 'Media',
   },
   {
     href: '/settings/channels',

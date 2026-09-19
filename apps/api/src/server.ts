@@ -350,6 +350,93 @@ app.get('/api/settings', async (req: Request, res: Response) => {
   res.status(200).json(merged);
 });
 
+// ==========================================
+// Media Catalog & Visual Assets Endpoints
+// ==========================================
+app.get('/api/settings/media', (req: Request, res: Response) => {
+  const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+  const settings = localStore.getSettings(tenantId);
+  const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+
+  res.status(200).json({
+    brochureImageUrl: settings.brochureImageUrl || `${apiBaseUrl}/media/brochures/omni_packages.png`,
+    paymentQrImageUrl: settings.paymentQrImageUrl || `${apiBaseUrl}/media/payments/payment_qr.png`,
+    catalogImageUrl: settings.catalogImageUrl || `${apiBaseUrl}/media/brochures/omni_packages.png`,
+    products: settings.products || [],
+  });
+});
+
+app.post('/api/settings/media/upload', upload.single('file'), (req: Request, res: Response) => {
+  try {
+    const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+    const category = (req.body.category as string) || 'product';
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'يرجى اختيار صورة للرفع' });
+    }
+
+    const tenantUploadDir = path.resolve(__dirname, '../uploads', tenantId, 'catalog');
+    if (!fs.existsSync(tenantUploadDir)) {
+      fs.mkdirSync(tenantUploadDir, { recursive: true });
+    }
+
+    const ext = path.extname(req.file.originalname) || '.png';
+    const filename = `${category}_${Date.now()}${ext}`;
+    const filePath = path.join(tenantUploadDir, filename);
+    fs.writeFileSync(filePath, req.file.buffer);
+
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+    const mediaUrl = `${apiBaseUrl}/media/${tenantId}/catalog/${filename}`;
+
+    const currentSettings = localStore.getSettings(tenantId);
+
+    if (category === 'brochure' || category === 'packages') {
+      localStore.updateSettings(tenantId, { brochureImageUrl: mediaUrl });
+    } else if (category === 'payment_qr') {
+      localStore.updateSettings(tenantId, { paymentQrImageUrl: mediaUrl });
+    } else if (category === 'catalog') {
+      localStore.updateSettings(tenantId, { catalogImageUrl: mediaUrl });
+    } else {
+      // Add product item
+      const productItem = {
+        id: `prod_${Date.now()}`,
+        name: req.body.name || 'منتج جديد',
+        price: req.body.price || '',
+        description: req.body.description || '',
+        imageUrl: mediaUrl,
+        createdAt: new Date().toISOString(),
+      };
+      const existingProducts = currentSettings.products || [];
+      localStore.updateSettings(tenantId, {
+        products: [productItem, ...existingProducts],
+      });
+    }
+
+    const updated = localStore.getSettings(tenantId);
+    res.status(200).json({
+      success: true,
+      mediaUrl,
+      settings: updated,
+    });
+  } catch (err: any) {
+    console.error('[REST Media Upload] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/settings/media/products/:productId', (req: Request, res: Response) => {
+  try {
+    const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+    const productId = String(req.params.productId);
+    const settings = localStore.getSettings(tenantId);
+    const updatedProducts = (settings.products || []).filter((p) => p.id !== productId);
+    localStore.updateSettings(tenantId, { products: updatedProducts });
+    res.status(200).json({ success: true, products: updatedProducts });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // REST: Update Settings (Gemini config & AI agent settings)
 app.post('/api/settings', async (req: Request, res: Response) => {
   const rawTenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';

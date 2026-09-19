@@ -88,6 +88,16 @@ export interface StoredSettings {
   brochureImageUrl?: string;
   paymentQrImageUrl?: string;
   catalogImageUrl?: string;
+  products?: ProductCatalogItem[];
+}
+
+export interface ProductCatalogItem {
+  id: string;
+  name: string;
+  price?: string;
+  description?: string;
+  imageUrl: string;
+  createdAt: string;
 }
 
 export interface KnowledgeItem {
