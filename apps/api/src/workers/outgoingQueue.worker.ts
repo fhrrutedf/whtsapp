@@ -97,6 +97,9 @@ export function startOutgoingWhatsAppWorker(): Worker<OutgoingWhatsAppJobData> {
             senderType: senderType || 'AGENT',
             senderId: senderId || 'system',
             senderName: senderName || 'Agent',
+            mediaUrl: job.data.mediaUrl,
+            mediaType: job.data.mediaType,
+            caption: job.data.caption,
             replyToMessageId: job.data.metadata?.replyToMessageId,
             messageKey: job.data.metadata?.messageKey,
           }

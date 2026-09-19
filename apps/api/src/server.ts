@@ -12,7 +12,7 @@ import crypto from 'crypto';
 import { MetaWebhookController } from './controllers/metaWebhook.controller';
 import { verifyMetaSignature, RequestWithRawBody } from './middleware/metaSignature.middleware';
 import { ComplianceService } from './services/compliance.service';
-import { initializeSocketGateway } from './sockets/socketGateway';
+import { initializeSocketGateway, getSocketGateway } from './sockets/socketGateway';
 import { startMetaWebhookWorker } from './workers/metaWebhook.worker';
 import { startOutgoingWhatsAppWorker } from './workers/outgoingQueue.worker';
 import { startKbSyncWorker } from './workers/kbSync.worker';
@@ -199,6 +199,87 @@ app.get('/api/conversations/:id/messages', async (req: Request, res: Response) =
 
   const storedMessages = localStore.getMessages(conversationId);
   res.status(200).json(storedMessages);
+});
+
+// REST: Upload and send media (image/document) in a conversation
+app.post('/api/conversations/:id/media', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+    const conversationId = String(req.params.id);
+    const caption = (req.body.caption as string) || '';
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'لم يتم إرفاق أي ملف' });
+    }
+
+    const tenantUploadDir = path.resolve(__dirname, '../uploads', tenantId);
+    if (!fs.existsSync(tenantUploadDir)) {
+      fs.mkdirSync(tenantUploadDir, { recursive: true });
+    }
+
+    const ext = path.extname(req.file.originalname) || '.jpg';
+    const filename = `out_${Date.now()}_${Math.random().toString(36).slice(2, 7)}${ext}`;
+    const filePath = path.join(tenantUploadDir, filename);
+    fs.writeFileSync(filePath, req.file.buffer);
+
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:4000';
+    const mediaUrl = `${apiBaseUrl}/media/${tenantId}/${filename}`;
+
+    // Extract target phone from conversation
+    let targetPhone = '';
+    const conv = localStore.getConversations(tenantId).find((c) => c.id === conversationId);
+    if (conv?.contactPhone) {
+      targetPhone = conv.contactPhone;
+    } else {
+      const match = conversationId.replace(/^[^_]*_/, '');
+      if (match && /^\d+$/.test(match)) targetPhone = match;
+    }
+
+    let messageId: string | null = null;
+    if (targetPhone) {
+      messageId = await whatsAppManager.sendMediaMessage(
+        tenantId,
+        targetPhone,
+        mediaUrl,
+        'image',
+        caption
+      );
+    } else {
+      // Local fallback for web/demo conversation
+      const sentId = `media_${Date.now()}`;
+      const messageRecord = {
+        id: sentId,
+        tenantId,
+        conversationId,
+        senderType: 'AGENT' as const,
+        senderId: 'agent',
+        senderName: 'You (Agent)',
+        content: caption || '[صورة]',
+        mediaUrl,
+        mediaType: 'image' as const,
+        deliveryStatus: 'SENT' as const,
+        createdAt: new Date().toISOString(),
+      };
+      localStore.saveMessage(messageRecord);
+      const io = getSocketGateway();
+      if (io) {
+        io.to(`tenant:${tenantId}`).emit('message:new', {
+          message: { ...messageRecord, isTemplate: false, templateName: null, metaMessageId: sentId },
+        });
+      }
+      messageId = sentId;
+    }
+
+    res.status(200).json({
+      success: true,
+      mediaUrl,
+      messageId,
+      filename,
+    });
+  } catch (err: any) {
+    console.error('[REST] Error uploading conversation media:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // REST: List all contacts

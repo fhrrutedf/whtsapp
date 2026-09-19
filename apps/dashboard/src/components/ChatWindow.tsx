@@ -28,7 +28,9 @@ import {
   Volume2,
   VolumeX,
   Zap,
-  BookOpen
+  BookOpen,
+  ImagePlus,
+  X
 } from 'lucide-react';
 import type { DeliveryStatus } from '@omni/types';
 import { MemoryManager } from './MemoryManager';
@@ -62,6 +64,20 @@ export function ChatWindow() {
   const [newFact, setNewFact] = useState('');
   const [isSavingFact, setIsSavingFact] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImageFile(file);
+      const url = URL.createObjectURL(file);
+      setImagePreviewUrl(url);
+    }
+    // reset input so same file can be selected again
+    if (e.target) e.target.value = '';
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -163,11 +179,41 @@ export function ChatWindow() {
     );
   });
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim() || !activeConversationId || isSending) return;
+    if ((!inputMessage.trim() && !selectedImageFile) || !activeConversationId || isSending) return;
 
     setIsSending(true);
+
+    if (selectedImageFile) {
+      const formData = new FormData();
+      formData.append('file', selectedImageFile);
+      if (inputMessage.trim()) {
+        formData.append('caption', inputMessage.trim());
+      }
+      try {
+        const res = await fetch(`${apiUrl}/api/conversations/${activeConversationId}/media`, {
+          method: 'POST',
+          headers: {
+            'x-tenant-id': tenantId,
+          },
+          body: formData,
+        });
+        if (res.ok) {
+          setSelectedImageFile(null);
+          setImagePreviewUrl(null);
+          setInputMessage('');
+          clearDraft(activeConversationId);
+          setShowSnippetsMenu(false);
+        }
+      } catch (err: any) {
+        console.error('Error sending media:', err.message);
+      } finally {
+        setIsSending(false);
+      }
+      return;
+    }
+
     try {
       sendTextMessage(activeConversationId, inputMessage.trim());
       setInputMessage('');
@@ -560,6 +606,34 @@ export function ChatWindow() {
             </div>
           )}
 
+          {/* Image Preview Banner if an image is selected */}
+          {imagePreviewUrl && (
+            <div className="mb-2 max-w-5xl mx-auto p-2.5 rounded-2xl bg-[#0c1424] border border-emerald-500/30 flex items-center justify-between gap-3 shadow-xl animate-fadeIn">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-11 h-11 rounded-xl overflow-hidden bg-black/50 border border-white/10 shrink-0">
+                  <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+                <div className="text-right overflow-hidden">
+                  <div className="text-xs font-bold text-white truncate max-w-sm">{selectedImageFile?.name}</div>
+                  <div className="text-[10px] text-emerald-400">
+                    {selectedImageFile ? (selectedImageFile.size / 1024).toFixed(1) : 0} KB • جاهزة للإرسال مع نص الشرح أدناه
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedImageFile(null);
+                  setImagePreviewUrl(null);
+                }}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-white/[0.05] transition"
+                title="إلغاء الصورة المرفقة"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleSend} className="flex items-center gap-2 max-w-5xl mx-auto">
             {/* Quick Canned Snippets Toggle */}
             <button
@@ -576,6 +650,27 @@ export function ChatWindow() {
               title="الردود الجاهزة السريعة (اضغط هنا أو اكتب /)"
             >
               <Zap className="w-4 h-4" />
+            </button>
+
+            {/* Image Attachment Button */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/png,image/jpeg,image/webp,image/jpg"
+              className="hidden"
+              onChange={handleImageSelect}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={`p-2.5 rounded-xl border transition ${
+                selectedImageFile
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                  : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-emerald-400 border-white/[0.08]'
+              }`}
+              title="إرفاق صورة للعميل (بروشور / كتالوج / إشعار سداد)"
+            >
+              <ImagePlus className="w-4 h-4" />
             </button>
 
             {/* AI Suggest Pill */}
@@ -599,7 +694,7 @@ export function ChatWindow() {
                 type="text"
                 value={inputMessage}
                 onChange={handleInputChange}
-                placeholder="اكتب ردك للعميل (اكتب / للردود السريعة، أو Enter للإرسال)..."
+                placeholder={selectedImageFile ? 'اكتب شرحاً مرافقاً للصورة (Caption)...' : 'اكتب ردك للعميل (اكتب / للردود السريعة، أو Enter للإرسال)...'}
                 className="w-full bg-[#070a12] border border-white/[0.09] rounded-2xl px-4 py-3 text-xs md:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition shadow-inner"
               />
             </div>
@@ -607,7 +702,7 @@ export function ChatWindow() {
             {/* Send Action */}
             <button
               type="submit"
-              disabled={!inputMessage.trim() || isSending}
+              disabled={(!inputMessage.trim() && !selectedImageFile) || isSending}
               className="px-5 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40 disabled:hover:from-emerald-500 disabled:hover:to-teal-500 text-emerald-950 font-black rounded-2xl flex items-center justify-center transition shadow-lg shadow-emerald-500/25"
               title="إرسال عبر واتساب"
             >

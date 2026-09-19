@@ -5,6 +5,9 @@ export interface OutgoingWhatsAppJobData {
   tenantId: string;
   toPhone: string;
   text: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'document' | 'audio';
+  caption?: string;
   conversationId?: string;
   senderType?: 'AGENT' | 'BOT';
   senderId?: string;

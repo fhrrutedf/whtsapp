@@ -656,14 +656,25 @@ export class WhatsAppManager {
                       const bubble = bubbles[i];
                       if (!bubble || !bubble.trim()) continue;
 
+                      let bubbleText = bubble;
+                      let bubbleMediaUrl: string | undefined;
+                      const mediaMatch = bubbleText.match(/\[(?:MEDIA|IMAGE):([^\]]+)\]/i);
+                      if (mediaMatch) {
+                        bubbleMediaUrl = mediaMatch[1].trim();
+                        bubbleText = bubbleText.replace(mediaMatch[0], '').trim();
+                      }
+
                       console.log(
-                        `[WhatsAppManager:${tenantId}] 📥 Pushing AI bubble ${i + 1}/${bubbles.length} for ${displayPhone} to OutgoingWhatsAppQueue...`
+                        `[WhatsAppManager:${tenantId}] 📥 Pushing AI bubble ${i + 1}/${bubbles.length} for ${displayPhone} to OutgoingWhatsAppQueue (Media: ${!!bubbleMediaUrl})...`
                       );
 
                       await this.enqueueOutgoingMessage({
                         tenantId,
                         toPhone: displayPhone,
-                        text: bubble,
+                        text: bubbleText,
+                        mediaUrl: bubbleMediaUrl,
+                        mediaType: bubbleMediaUrl ? 'image' : undefined,
+                        caption: bubbleText,
                         conversationId: convId,
                         senderType: 'BOT',
                         senderId: 'gemini-ai',
@@ -878,6 +889,9 @@ export class WhatsAppManager {
       bypassOptOutCheck?: boolean;
       replyToMessageId?: string;
       messageKey?: any;
+      mediaUrl?: string;
+      mediaType?: 'image' | 'video' | 'document' | 'audio';
+      caption?: string;
     }
   ): Promise<string | null> {
     // 0. Outbound Rule: Strictly prevent dispatching to opted-out contacts
@@ -942,16 +956,41 @@ export class WhatsAppManager {
     }
 
     // Step 6: Wait dynamically based on response length (50ms per character + ±15% jitter)
-    const baseDelayMs = text.length * 50;
+    const baseDelayMs = (text || '').length * 50;
     const clampedDelayMs = Math.min(Math.max(baseDelayMs, 2000), 20000);
     const jitterMultiplier = 1 + (Math.random() * 0.30 - 0.15);
     const finalTypingDelayMs = Math.round(clampedDelayMs * jitterMultiplier);
-    console.log(`[The Humanizer:${tenantId}] 6/8 ⌨️ Active typing duration: ${finalTypingDelayMs}ms (${text.length} chars)...`);
+    console.log(`[The Humanizer:${tenantId}] 6/8 ⌨️ Active typing duration: ${finalTypingDelayMs}ms (${(text || '').length} chars)...`);
     await new Promise((resolve) => setTimeout(resolve, finalTypingDelayMs));
 
-    // Step 7: Send the actual message
-    console.log(`[The Humanizer:${tenantId}] 7/8 📤 Dispatching message to ${targetJid}: "${text.slice(0, 60)}..."`);
-    const sent = await sock.sendMessage(targetJid, { text });
+    // Step 7: Send the actual message (Text or Media with Caption)
+    let sent: any;
+    if (options?.mediaUrl && (options.mediaType === 'image' || !options.mediaType)) {
+      let mediaSource: any;
+      if (options.mediaUrl.startsWith('http://') || options.mediaUrl.startsWith('https://')) {
+        mediaSource = { url: options.mediaUrl };
+      } else if (fs.existsSync(options.mediaUrl)) {
+        mediaSource = fs.readFileSync(options.mediaUrl);
+      } else {
+        const localPath = path.resolve(__dirname, '../../uploads', options.mediaUrl.replace('/media/', ''));
+        if (fs.existsSync(localPath)) {
+          mediaSource = fs.readFileSync(localPath);
+        } else {
+          mediaSource = { url: options.mediaUrl };
+        }
+      }
+
+      console.log(
+        `[The Humanizer:${tenantId}] 7/8 📸 Dispatching image to ${targetJid} with caption: "${(text || options.caption || '').slice(0, 60)}..."`
+      );
+      sent = await sock.sendMessage(targetJid, {
+        image: mediaSource,
+        caption: text || options.caption || undefined,
+      });
+    } else {
+      console.log(`[The Humanizer:${tenantId}] 7/8 📤 Dispatching message to ${targetJid}: "${(text || '').slice(0, 60)}..."`);
+      sent = await sock.sendMessage(targetJid, { text });
+    }
     const sentId = sent?.key?.id || `out_${Date.now()}`;
 
     // Step 8: Immediately revert presence to 'unavailable' (Screen-off stealth)
@@ -970,7 +1009,8 @@ export class WhatsAppManager {
     const senderName = options?.senderName || (senderType === 'BOT' ? 'Gemini AI' : 'You (Agent)');
 
     const contact = localStore.upsertContact(tenantId, displayPhone);
-    localStore.upsertConversation(convId, tenantId, contact, text, false);
+    const displayContent = text || options?.caption || (options?.mediaUrl ? '[صورة]' : '');
+    localStore.upsertConversation(convId, tenantId, contact, displayContent, false);
 
     const messageRecord = {
       id: sentId,
@@ -979,10 +1019,13 @@ export class WhatsAppManager {
       senderType: senderType as any,
       senderId,
       senderName,
-      content: text,
+      content: displayContent,
+      mediaUrl: options?.mediaUrl,
+      mediaType: options?.mediaType || (options?.mediaUrl ? ('image' as const) : undefined),
       deliveryStatus: 'SENT' as const,
       createdAt: new Date().toISOString(),
     };
+    localStore.saveMessage(messageRecord);
     localStore.saveMessage(messageRecord);
 
     const io = getSocketGateway();
@@ -1023,6 +1066,29 @@ export class WhatsAppManager {
       tenantId,
       toPhone,
       text,
+      senderType: 'AGENT',
+      senderId: 'agent',
+      senderName: 'You (Agent)',
+    });
+  }
+
+  /**
+   * Send Media Message (Image with optional Caption) via OutgoingWhatsAppQueue
+   */
+  public async sendMediaMessage(
+    tenantId: string,
+    toPhone: string,
+    mediaUrl: string,
+    mediaType: 'image' | 'video' | 'document' | 'audio' = 'image',
+    caption?: string
+  ): Promise<string | null> {
+    return this.enqueueOutgoingMessage({
+      tenantId,
+      toPhone,
+      text: caption || '',
+      mediaUrl,
+      mediaType,
+      caption,
       senderType: 'AGENT',
       senderId: 'agent',
       senderName: 'You (Agent)',

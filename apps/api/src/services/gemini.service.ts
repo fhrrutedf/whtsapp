@@ -363,6 +363,15 @@ export class GeminiService {
       skillRegistry.getCombinedSystemPrompts() +
       `\nتوجيه حاسم: إذا أبدى العميل نية دفع أو اعتراض على السعر أو رغبة باجتماع أو غضب أو رغبة بشراء، استخدم الأداة المناسبة فوراً.\n`;
 
+    // Multimodal Vision Understanding Instructions
+    const visionContext =
+      `\n\n--- 👁️ قدرات فهم الصور واستقبال الوسائط (Multimodal Vision Engine) ---\n` +
+      `إذا أرسل العميل صورة أو مستنداً مرئياً، انظر إليها وحللها بدقة:\n` +
+      `1. إذا كانت الصورة إيصال تحويل بنكي أو سداد (Bank Transfer Receipt): اقرأ المبلغ بالريال، اسم البنك، اسم المحول، والرقم المرجعي، وأكد استلام الحوالة فوراً بلطف وتطمين.\n` +
+      `2. إذا كانت صورة منتج أو سلعة يسأل عنها العميل: تعرف على المنتج والموديل وطابقه مع قاعدة المعرفة وأخبر العميل بمواصفاته وتوفره وسعره.\n` +
+      `3. إذا كانت لقطة شاشة لخطأ تقني أو استفسار: افحص محتوى الشاشة وقدم حلاً مباشراً وواضحاً.\n` +
+      `4. إذا طلب العميل رؤية بروشور الباقات أو باركود الدفع أو صور المنتجات: استدعِ أداة media_dispatcher أو أرفق رابط الصورة بالصيغة: [MEDIA:الرابط] مع النص الترحيبي.\n`;
+
     const systemPrompt =
       basePrompt +
       humanStyleRules +
@@ -371,7 +380,8 @@ export class GeminiService {
       escalationContext +
       memoryContext +
       knowledgeContext +
-      skillsContext;
+      skillsContext +
+      visionContext;
 
     // Route to OpenRouter if selected as primary provider
     if (settings.aiProvider === 'openrouter' && openrouterKey) {
@@ -407,7 +417,13 @@ export class GeminiService {
     for (let i = 0; i < validHistory.length; i++) {
       const msg = validHistory[i];
       const role = msg.senderType === 'CUSTOMER' || msg.senderType === 'CONTACT' ? 'user' : 'model';
-      const parts: any[] = [{ text: msg.content }];
+      let textContent = msg.content;
+      if (i === validHistory.length - 1 && role === 'user' && mediaBase64 && mediaMimeType) {
+        if (!textContent || textContent.includes('📷 صورة')) {
+          textContent = 'انظر لهذه الصورة التي أرسلتها لك بعناية فائقة وافحص محتواها (إيصال تحويل بنكي، صورة منتج، لقطة شاشة، إلخ) وأجبني بدقة واحترافية وبنفس اللهجة كإنسان ودود.';
+        }
+      }
+      const parts: any[] = [{ text: textContent }];
 
       // If this is the last turn and we have multimodal media
       if (i === validHistory.length - 1 && role === 'user' && mediaBase64 && mediaMimeType) {

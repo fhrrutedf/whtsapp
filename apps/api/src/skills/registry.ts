@@ -11,6 +11,7 @@ import { CustomerSuccessSkill } from './growth/customerSuccess.skill';
 import { RevenueOperationsSkill } from './growth/revenueOperations.skill';
 import { SalesEngineerSkill } from './growth/salesEngineer.skill';
 import { BusinessGrowthRouterSkill } from './growth/businessGrowthRouter.skill';
+import { MediaDispatcherSkill } from './sales/mediaDispatcher.skill';
 
 export class SkillRegistry {
   private skills = new Map<string, BaseSkill>();
@@ -24,6 +25,7 @@ export class SkillRegistry {
     this.register(new CartRecoverySkill());
     this.register(new ChurnRiskDetectorSkill());
     this.register(new MeetingSchedulerSkill());
+    this.register(new MediaDispatcherSkill());
     // Strategic Growth & RevOps skills
     this.register(new CustomerSuccessSkill());
     this.register(new RevenueOperationsSkill());

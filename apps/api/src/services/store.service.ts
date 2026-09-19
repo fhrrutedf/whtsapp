@@ -84,6 +84,10 @@ export interface StoredSettings {
   checkoutBaseUrl?: string;
   meetingSchedulerUrl?: string;
   defaultDiscountPercentage?: number;
+  // 11. Visual Media Assets & Catalogs
+  brochureImageUrl?: string;
+  paymentQrImageUrl?: string;
+  catalogImageUrl?: string;
 }
 
 export interface KnowledgeItem {
