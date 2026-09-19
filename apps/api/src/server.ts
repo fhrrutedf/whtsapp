@@ -32,6 +32,7 @@ import { BusinessHoursController } from './controllers/businessHours.controller'
 import { GdprController } from './controllers/gdpr.controller';
 import { skillRegistry } from './skills/registry';
 import { prisma } from '@omni/database';
+import { AuthService } from './services/auth.service';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 30 * 1024 * 1024 } });
 
@@ -71,6 +72,48 @@ app.use(express.urlencoded({ extended: true }));
 // Health Check
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'HEALTHY', timestamp: new Date().toISOString() });
+});
+
+// ==========================================
+// Authentication Routes (Zero-Config JWT + Scrypt)
+// ==========================================
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+  try {
+    const result = await AuthService.register(req.body);
+    res.status(201).json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'فشل إنشاء الحساب' });
+  }
+});
+
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  try {
+    const result = await AuthService.login(req.body);
+    res.status(200).json(result);
+  } catch (err: any) {
+    res.status(401).json({ error: err.message || 'بيانات الدخول غير صحيحة' });
+  }
+});
+
+app.get('/api/auth/me', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'غير مصرح بالدخول' });
+    }
+    const token = authHeader.split(' ')[1];
+    const payload = AuthService.verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({ error: 'الجلسة منتهية، يرجى تسجيل الدخول مجدداً' });
+    }
+    const user = await AuthService.getMe(payload.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
+    }
+    res.status(200).json({ user });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Meta Webhook Verification (Challenge Handshake)

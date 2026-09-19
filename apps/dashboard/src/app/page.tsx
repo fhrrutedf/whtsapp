@@ -20,8 +20,13 @@ import {
   Sparkles,
   Shield,
   Command,
-  CheckCircle2
+  CheckCircle2,
+  LogOut,
+  LogIn,
+  UserPlus,
+  ChevronUp
 } from 'lucide-react';
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function DashboardPage() {
   const { 
@@ -35,12 +40,15 @@ export default function DashboardPage() {
     conversations
   } = useChatStore();
 
+  const { user, tenant, logout, checkAuth } = useAuthStore();
   const [mounted, setMounted] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+    checkAuth();
     initSocket(tenantId);
-  }, [initSocket, tenantId]);
+  }, [initSocket, tenantId, checkAuth]);
 
   const totalUnread = mounted 
     ? conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0)
@@ -205,12 +213,84 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {/* User Profile Avatar */}
-          <div className="relative group cursor-pointer" title="المشرف العام (Super Admin)">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-white/10 flex items-center justify-center font-bold text-xs text-slate-200 group-hover:border-emerald-500/50 transition-colors shadow-inner">
-              AD
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-[#090d16]" />
+          {/* User Profile Avatar with Popover */}
+          <div className="relative">
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-white/10 flex items-center justify-center font-bold text-xs text-slate-200 hover:border-emerald-500/50 transition-all shadow-inner focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              title={user?.name || 'المشرف العام (Super Admin)'}
+            >
+              {user?.name ? user.name.slice(0, 2).toUpperCase() : 'AD'}
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-[#090d16]" />
+            </button>
+
+            {/* Profile Menu Popover */}
+            {showProfileMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setShowProfileMenu(false)} 
+                />
+                <div 
+                  className="absolute bottom-12 right-0 w-64 p-3 rounded-2xl bg-[#0d1424] border border-white/10 shadow-2xl backdrop-blur-xl z-50 animate-fadeIn text-right"
+                  dir="rtl"
+                >
+                  <div className="px-3 py-2 border-b border-white/[0.08] mb-2">
+                    <div className="text-xs font-bold text-white truncate">
+                      {user?.name || 'مشرف الحساب (تجريبي)'}
+                    </div>
+                    <div className="text-[11px] text-slate-400 truncate">
+                      {user?.email || 'admin@omni.sa'}
+                    </div>
+                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-semibold">
+                      <span>{tenant?.name || 'المقر الرئيسي'}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Link
+                      href="/settings/general"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-white/[0.05] hover:text-white transition-colors"
+                    >
+                      <Settings className="w-3.5 h-3.5 text-slate-400" />
+                      <span>إعدادات مساحة العمل</span>
+                    </Link>
+
+                    <Link
+                      href="/register"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-white/[0.05] hover:text-cyan-400 transition-colors"
+                    >
+                      <UserPlus className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>إنشاء مساحة عمل جديدة</span>
+                    </Link>
+
+                    <Link
+                      href="/login"
+                      onClick={() => setShowProfileMenu(false)}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-300 hover:bg-white/[0.05] hover:text-emerald-400 transition-colors"
+                    >
+                      <LogIn className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>تسجيل الدخول بحساب آخر</span>
+                    </Link>
+
+                    {user && (
+                      <button
+                        onClick={() => {
+                          logout();
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-rose-400 hover:bg-rose-500/10 transition-colors border-t border-white/[0.06] mt-1 pt-2"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>تسجيل الخروج</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </aside>
