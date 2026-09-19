@@ -297,6 +297,7 @@ export function TeamSettings() {
               <input
                 type="email"
                 required
+                suppressHydrationWarning
                 placeholder="name@company.com"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}

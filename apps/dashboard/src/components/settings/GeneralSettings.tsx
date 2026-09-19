@@ -117,6 +117,7 @@ export function GeneralSettings() {
                 <Mail className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
                 <input
                   type="email"
+                  suppressHydrationWarning
                   value={supportEmail}
                   onChange={(e) => setSupportEmail(e.target.value)}
                   placeholder="support@company.com"

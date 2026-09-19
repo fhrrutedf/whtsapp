@@ -178,6 +178,7 @@ export default function RegisterPage() {
                 <input
                   type="email"
                   required
+                  suppressHydrationWarning
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);

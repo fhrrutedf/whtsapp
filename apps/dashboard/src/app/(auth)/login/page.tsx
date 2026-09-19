@@ -123,6 +123,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
+                suppressHydrationWarning
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
