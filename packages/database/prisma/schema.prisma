@@ -197,7 +197,8 @@ model Contact {
   id                 String              @id @default(uuid())
   tenantId           String              @map("tenant_id")
   phoneNumber        String?             @map("phone_number")
-  name               String?
+  name               String?             // Name told by customer themselves
+  whatsappPushName   String?             @map("whatsapp_push_name") // WA display name (do not use to greet)
   email              String?
   avatarUrl          String?             @map("avatar_url")
   notes              String?             @db.Text
@@ -205,6 +206,20 @@ model Contact {
   isOptedOut         Boolean             @default(false) @map("is_opted_out")
   customAttributes   Json?               @default("{}") @map("custom_attributes")
   lastSeenAt         DateTime?           @map("last_seen_at")
+
+  // CRM Lead Intelligence
+  countryCode        String?             @map("country_code")       // e.g. "SY", "SA", "AE"
+  countryName        String?             @map("country_name")       // e.g. "سوريا", "السعودية"
+  interestLevel      String?             @default("UNKNOWN") @map("interest_level")
+  // UNKNOWN | COLD | WARM | HOT | PAID | UNINTERESTED
+  interestScore      Int?                @default(0) @map("interest_score") // 0-100
+  interestNotes      String?             @db.Text @map("interest_notes") // AI summary of why this level
+  lastInterestUpdatedAt DateTime?        @map("last_interest_updated_at")
+  paidAt             DateTime?           @map("paid_at")            // When they paid
+  courseDeliveredAt  DateTime?           @map("course_delivered_at") // When course link was sent
+  leadSource         String?             @map("lead_source")        // "WHATSAPP_INBOUND" | "CAMPAIGN" | ...
+  firstContactAt     DateTime?           @map("first_contact_at")   // First ever message
+
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
 
@@ -216,6 +231,7 @@ model Contact {
   @@unique([tenantId, phoneNumber])
   @@index([tenantId])
   @@index([phoneNumber])
+  @@index([tenantId, interestLevel])
   @@map("contacts")
 }
 

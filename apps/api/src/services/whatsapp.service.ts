@@ -28,6 +28,7 @@ import { outgoingWhatsAppQueue, OutgoingWhatsAppJobData } from '../queues/outgoi
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { BusinessHoursService } from './businessHours.service';
 import { setConversationSla } from './sla.monitor';
+import { updateContactLeadScore } from './leadScoring.service';
 
 // Suppress verbose Baileys pino logs in development
 const logger = P({ level: 'silent' });
@@ -644,6 +645,11 @@ export class WhatsAppManager {
 
                   // Extract and update persistent customer memory in background
                   GeminiService.extractAndSaveMemoryFacts(tenantId, displayPhone, latestHistory).catch(() => {});
+
+                  // Update CRM lead score based on full conversation history
+                  updateContactLeadScore(tenantId, displayPhone, latestHistory, {
+                    pushName: pushName !== displayPhone ? pushName : undefined,
+                  }).catch(() => {});
 
                   if (aiReply && !aiReply.startsWith('تنبيه:') && !aiReply.startsWith('تعذر')) {
                     // 1. Clean asterisks and robot formatting

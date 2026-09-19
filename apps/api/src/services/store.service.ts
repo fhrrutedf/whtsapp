@@ -5,7 +5,8 @@ export interface StoredContact {
   id: string;
   tenantId: string;
   phoneNumber: string;
-  name: string;
+  name: string;           // Name told to us by the customer in conversation (NOT from WhatsApp)
+  whatsappPushName?: string; // WhatsApp display name (DO NOT use to greet the customer)
   lastSeenAt: string;
   notes?: string;
   memoryFacts?: string[];
@@ -98,6 +99,10 @@ export interface StoredSettings {
   paymentQrImageUrl?: string;
   catalogImageUrl?: string;
   products?: ProductCatalogItem[];
+  // 12. Automated Course Delivery & Re-engagement (Smart Follow-Up)
+  courseAccessTelegramUrl?: string;
+  followUpEnabled?: boolean;
+  followUpDelayHours?: number;
 }
 
 export interface ProductCatalogItem {
@@ -177,11 +182,20 @@ class LocalStoreManager {
     const now = new Date().toISOString();
     const existing = this.data.contacts[key];
 
+    // IMPORTANT: 'name' passed here is usually WhatsApp pushName (display name).
+    // We store it separately as 'whatsappPushName' and NEVER overwrite the real customer name
+    // unless it was set through a deliberate updateContactMemory call.
+    const isPhoneAsName = !name || name === phoneNumber || name === phoneNumber.replace(/^\+/, '');
+    const realName = existing?.name && existing.name !== existing.phoneNumber
+      ? existing.name   // keep the real name if already set
+      : (isPhoneAsName ? phoneNumber : phoneNumber); // default to phone number, NOT pushName
+
     const contact: StoredContact = {
       id: existing ? existing.id : `cnt_${phoneNumber.replace(/\D/g, '')}`,
       tenantId,
       phoneNumber,
-      name: name || existing?.name || phoneNumber,
+      name: realName,
+      whatsappPushName: name && !isPhoneAsName ? name : existing?.whatsappPushName,
       lastSeenAt: now,
       notes: existing?.notes,
       memoryFacts: existing?.memoryFacts || [],

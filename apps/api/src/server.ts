@@ -27,6 +27,7 @@ import { BillingService } from './services/billing.service';
 import { AnalyticsController } from './controllers/analytics.controller';
 import { startCampaignWorker } from './workers/campaign.worker';
 import { startSlaMonitor } from './services/sla.monitor';
+import { startFollowUpWorker } from './services/followup.worker';
 import { CampaignController } from './controllers/campaign.controller';
 import { BusinessHoursController } from './controllers/businessHours.controller';
 import { GdprController } from './controllers/gdpr.controller';
@@ -287,6 +288,85 @@ app.get('/api/contacts', (req: Request, res: Response) => {
   const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
   const contacts = localStore.getContacts(tenantId);
   res.status(200).json(contacts);
+});
+
+// REST: CRM Leads — full contact intelligence table
+app.get('/api/leads', async (req: Request, res: Response) => {
+  const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+  try {
+    // Fetch from Supabase (has the new CRM columns)
+    const dbContacts = await prisma.contact.findMany({
+      where: { tenantId },
+      orderBy: [
+        { updatedAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        phoneNumber: true,
+        name: true,
+        email: true,
+        notes: true,
+        memoryFacts: true,
+        isOptedOut: true,
+        lastSeenAt: true,
+        createdAt: true,
+        customAttributes: true,
+      },
+    });
+
+    // Merge with localStore for CRM fields (stored via updateContactLeadScore)
+    const localContacts = localStore.getContacts(tenantId);
+    const localByPhone = new Map(localContacts.map((c) => [c.phoneNumber, c]));
+
+    const leads = dbContacts.map((db) => {
+      const local = db.phoneNumber ? localByPhone.get(db.phoneNumber) : null;
+      const custom = (db.customAttributes as Record<string, any>) || {};
+
+      // CRM fields live in customAttributes until Prisma client regenerates
+      return {
+        id: db.id,
+        name: db.name || local?.name,
+        whatsappPushName: local?.whatsappPushName || custom.whatsapp_push_name,
+        phoneNumber: db.phoneNumber,
+        email: db.email,
+        notes: db.notes,
+        memoryFacts: db.memoryFacts || local?.memoryFacts || [],
+        isOptedOut: db.isOptedOut,
+        lastSeenAt: db.lastSeenAt?.toISOString() || local?.lastSeenAt,
+        firstContactAt: db.createdAt?.toISOString(),
+        // CRM intelligence — from customAttributes (written by LeadScoringService)
+        countryCode: custom.country_code || local?.whatsappPushName?.startsWith('+') ? undefined : undefined,
+        countryName: custom.country_name,
+        interestLevel: custom.interest_level || 'UNKNOWN',
+        interestScore: custom.interest_score ?? 0,
+        interestNotes: custom.interest_notes,
+        lastInterestUpdatedAt: custom.last_interest_updated_at,
+        paidAt: custom.paid_at,
+        courseDeliveredAt: custom.course_delivered_at,
+        leadSource: custom.lead_source,
+      };
+    });
+
+    // Sort by interest score descending
+    leads.sort((a, b) => (b.interestScore ?? 0) - (a.interestScore ?? 0));
+
+    res.json(leads);
+  } catch (err: any) {
+    // Fallback to localStore if DB fails
+    const localContacts = localStore.getContacts(tenantId);
+    res.json(localContacts.map((c) => ({
+      id: c.id,
+      name: c.name !== c.phoneNumber ? c.name : undefined,
+      whatsappPushName: c.whatsappPushName,
+      phoneNumber: c.phoneNumber,
+      notes: c.notes,
+      memoryFacts: c.memoryFacts || [],
+      isOptedOut: c.isOptedOut,
+      lastSeenAt: c.lastSeenAt,
+      interestLevel: 'UNKNOWN',
+      interestScore: 0,
+    })));
+  }
 });
 
 // REST: Get Settings (Gemini config & AI agent settings)
@@ -1523,6 +1603,13 @@ try {
   console.log('🚀 BullMQ Workers (Meta, Outgoing, KB Sync, Campaigns) & SLA Monitor initialized');
 } catch (err: any) {
   console.warn('⚠️ BullMQ Workers failed to connect to Redis:', err.message);
+}
+
+// Start Automated Follow-Up Worker (re-engages inactive leads)
+try {
+  startFollowUpWorker();
+} catch (err: any) {
+  console.warn('⚠️ Follow-up worker failed to start:', (err as Error).message);
 }
 
 server.listen(PORT, () => {
