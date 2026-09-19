@@ -355,7 +355,7 @@ class LocalStoreManager {
       autoReplyDelaySeconds: s.autoReplyDelaySeconds !== undefined ? s.autoReplyDelaySeconds : 30,
       interMessageDelaySeconds: s.interMessageDelaySeconds !== undefined ? s.interMessageDelaySeconds : 15,
       handoffKeywords: s.handoffKeywords || ['موظف', 'بشري', 'شكوى', 'مدير', 'اتصال', 'تحويل', 'إلغاء'],
-      handoffMaxTurns: s.handoffMaxTurns !== undefined ? s.handoffMaxTurns : 5,
+      handoffMaxTurns: s.handoffMaxTurns !== undefined ? s.handoffMaxTurns : 0,
       handoffStopNotification:
         s.handoffStopNotification ||
         'تم تحويل محادثتك إلى أحد موظفي خدمة العملاء وسيقوم بالرد عليك مباشرة في أقرب وقت ممكن. شكراً لصبرك!',

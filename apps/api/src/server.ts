@@ -425,18 +425,18 @@ app.delete('/api/giveaways/:id', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-// REST: Get Settings (Gemini config & AI agent settings)
 app.get('/api/settings', async (req: Request, res: Response) => {
   const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
   let dbSettings: any = null;
   try {
+    const resolvedTenantId = await TenantService.resolveTenantId(tenantId);
     const [config, tenant] = await Promise.all([
       prisma.aIAgentConfig.findFirst({
-        where: { tenantId },
+        where: { tenantId: resolvedTenantId },
         orderBy: { updatedAt: 'desc' },
       }),
       prisma.tenant.findUnique({
-        where: { id: tenantId },
+        where: { id: resolvedTenantId },
       }),
     ]);
 
@@ -671,7 +671,7 @@ const handleUpdateSettings = async (req: Request, res: Response) => {
         escalationRules: req.body.escalationRules || null,
         escalationPreActions: req.body.escalationPreActions || null,
         handoffKeywords: req.body.handoffKeywords || [],
-        handoffMaxTurns: req.body.handoffMaxTurns !== undefined ? req.body.handoffMaxTurns : 5,
+        handoffMaxTurns: req.body.handoffMaxTurns !== undefined ? req.body.handoffMaxTurns : 0,
         handoffStopNotification: req.body.handoffStopNotification || null,
         safetyGuardrails: req.body.safetyGuardrails || null,
         errorRecovery: req.body.errorRecovery || null,
@@ -693,7 +693,7 @@ const handleUpdateSettings = async (req: Request, res: Response) => {
         escalationRules: req.body.escalationRules || null,
         escalationPreActions: req.body.escalationPreActions || null,
         handoffKeywords: req.body.handoffKeywords || [],
-        handoffMaxTurns: req.body.handoffMaxTurns !== undefined ? req.body.handoffMaxTurns : 5,
+        handoffMaxTurns: req.body.handoffMaxTurns !== undefined ? req.body.handoffMaxTurns : 0,
         handoffStopNotification: req.body.handoffStopNotification || null,
         safetyGuardrails: req.body.safetyGuardrails || null,
         errorRecovery: req.body.errorRecovery || null,
