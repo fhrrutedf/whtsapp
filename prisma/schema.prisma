@@ -115,6 +115,13 @@ model Tenant {
   brandingLogo    String?  @map("branding_logo")
   primaryColor    String?  @default("#10B981") @map("primary_color")
   widgetGreeting  String?  @map("widget_greeting")
+  timezone        String?  @default("Asia/Riyadh")
+  currency        String?  @default("SAR")
+  supportEmail    String?  @map("support_email")
+  brochureImageUrl  String? @map("brochure_image_url")
+  paymentQrImageUrl String? @map("payment_qr_image_url")
+  catalogImageUrl   String? @map("catalog_image_url")
+  products          Json?    @default("[]")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

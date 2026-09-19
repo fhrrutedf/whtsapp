@@ -366,7 +366,7 @@ app.get('/api/settings/media', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/settings/media/upload', upload.single('file'), (req: Request, res: Response) => {
+app.post('/api/settings/media/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
     const category = (req.body.category as string) || 'product';
@@ -413,6 +413,39 @@ app.post('/api/settings/media/upload', upload.single('file'), (req: Request, res
     }
 
     const updated = localStore.getSettings(tenantId);
+
+    // Sync to Supabase PostgreSQL
+    try {
+      const resolvedTenantId = await TenantService.resolveTenantId(tenantId);
+      if (category === 'brochure' || category === 'packages') {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "tenants" SET "brochure_image_url" = $1 WHERE "id" = $2::uuid`,
+          mediaUrl,
+          resolvedTenantId
+        );
+      } else if (category === 'payment_qr') {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "tenants" SET "payment_qr_image_url" = $1 WHERE "id" = $2::uuid`,
+          mediaUrl,
+          resolvedTenantId
+        );
+      } else if (category === 'catalog') {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "tenants" SET "catalog_image_url" = $1 WHERE "id" = $2::uuid`,
+          mediaUrl,
+          resolvedTenantId
+        );
+      } else {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "tenants" SET "products" = $1::jsonb WHERE "id" = $2::uuid`,
+          JSON.stringify(updated.products || []),
+          resolvedTenantId
+        );
+      }
+    } catch (dbErr: any) {
+      console.warn('[REST Media Upload] DB Sync warning:', dbErr.message);
+    }
+
     res.status(200).json({
       success: true,
       mediaUrl,
@@ -424,13 +457,26 @@ app.post('/api/settings/media/upload', upload.single('file'), (req: Request, res
   }
 });
 
-app.delete('/api/settings/media/products/:productId', (req: Request, res: Response) => {
+app.delete('/api/settings/media/products/:productId', async (req: Request, res: Response) => {
   try {
     const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
     const productId = String(req.params.productId);
     const settings = localStore.getSettings(tenantId);
     const updatedProducts = (settings.products || []).filter((p) => p.id !== productId);
     localStore.updateSettings(tenantId, { products: updatedProducts });
+
+    // Sync to Supabase PostgreSQL
+    try {
+      const resolvedTenantId = await TenantService.resolveTenantId(tenantId);
+      await prisma.$executeRawUnsafe(
+        `UPDATE "tenants" SET "products" = $1::jsonb WHERE "id" = $2::uuid`,
+        JSON.stringify(updatedProducts),
+        resolvedTenantId
+      );
+    } catch (dbErr: any) {
+      console.warn('[REST Media Delete] DB Sync warning:', dbErr.message);
+    }
+
     res.status(200).json({ success: true, products: updatedProducts });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

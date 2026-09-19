@@ -361,25 +361,61 @@ export class GeminiService {
     const skillsContext =
       `\n\n--- 🧩 المهارات والأدوات الذكية المتاحة (Active Agentic Skills) ---\n` +
       skillRegistry.getCombinedSystemPrompts() +
-      `\nتوجيه حاسم: إذا أبدى العميل نية دفع أو اعتراض على السعر أو رغبة باجتماع أو غضب أو رغبة بشراء، استخدم الأداة المناسبة فوراً.\n`;
+      `\nتوجيه حاسم: إذا أبدى العميل نية دفع أو رغبة بشراء أو طلب صورة أو بروشور أو استفسر عن سعر، استخدم الأداة المناسبة فوراً أو قدم البيانات مباشرة.\n`;
 
     // Multimodal Vision Understanding Instructions
     const visionContext =
       `\n\n--- 👁️ قدرات فهم الصور واستقبال الوسائط (Multimodal Vision Engine) ---\n` +
-      `إذا أرسل العميل صورة أو مستنداً مرئياً، انظر إليها وحللها بدقة:\n` +
-      `1. إذا كانت الصورة إيصال تحويل بنكي أو سداد (Bank Transfer Receipt): اقرأ المبلغ بالريال، اسم البنك، اسم المحول، والرقم المرجعي، وأكد استلام الحوالة فوراً بلطف وتطمين.\n` +
-      `2. إذا كانت صورة منتج أو سلعة يسأل عنها العميل: تعرف على المنتج والموديل وطابقه مع قاعدة المعرفة وأخبر العميل بمواصفاته وتوفره وسعره.\n` +
-      `3. إذا كانت لقطة شاشة لخطأ تقني أو استفسار: افحص محتوى الشاشة وقدم حلاً مباشراً وواضحاً.\n` +
+      `إذا أرسل العميل صورة أو مستنداً مرئياً، انظر إليها وحللها بدقة وسرعة:\n` +
+      `1. إذا كانت الصورة إيصال تحويل بنكي أو سداد (Bank Transfer Receipt): اقرأ المبلغ بالريال، اسم البنك، اسم المحول، والرقم المرجعي، وأكد استلام الحوالة فوراً بلطف وتطمين (مثال: "وصل الإيصال بمبلغ ... الله يعطيك العافية، جاري التفعيل فوراً").\n` +
+      `2. إذا كانت صورة منتج أو سلعة يسأل عنها العميل: تعرف على المنتج والموديل وطابقه مع الكتالوج وقاعدة المعرفة وأخبر العميل بمواصفاته وسعره فوراً.\n` +
+      `3. إذا كانت لقطة شاشة لخطأ تقني: افحص الخطأ وقدم حلاً مباشراً وسريعاً.\n` +
       `4. إذا طلب العميل رؤية بروشور الباقات أو باركود الدفع أو صور المنتجات: استدعِ أداة media_dispatcher أو أرفق رابط الصورة بالصيغة: [MEDIA:الرابط] مع النص الترحيبي.\n`;
+
+    // 🛍️ Live Product Catalog & Visual Media
+    let catalogContext = '';
+    const products = settings.products || [];
+    const brochureUrl = settings.brochureImageUrl;
+    const paymentQrUrl = settings.paymentQrImageUrl;
+
+    if (products.length > 0 || brochureUrl || paymentQrUrl) {
+      catalogContext = `\n\n--- 🛍️ كتالوج المنتجات والوسائط المرئية المعتمدة (Live Catalog & Media) ---\n`;
+      if (brochureUrl) {
+        catalogContext += `- بروشور الأسعار والباقات الرسمي: ${brochureUrl}\n  (إذا طلب العميل الأسعار، العروض، أو البروشور، استدعِ media_dispatcher أو أرسل هذا الرابط بصيغة [MEDIA:${brochureUrl}] مع رسالة توضيحية).\n`;
+      }
+      if (paymentQrUrl) {
+        catalogContext += `- باركود الحساب البنكي والدفع الفوري (Payment QR): ${paymentQrUrl}\n  (إذا رغب العميل بالدفع أو التحويل البنكي، أرسل فوراً تفاصيل الحساب وهذا الباركود بصيغة [MEDIA:${paymentQrUrl}] مع الترحيب به دون تحويله لبشري طالما بإمكانك تزويده ببيانات الدفع).\n`;
+      }
+      if (products.length > 0) {
+        catalogContext += `المنتجات والخدمات المتوفرة في الكتالوج:\n`;
+        products.forEach((p, idx) => {
+          catalogContext += `  ${idx + 1}. [${p.name}] - السعر: ${p.price ? p.price + ' ريال' : 'حسب الطلب'}\n`;
+          if (p.description) catalogContext += `     الوصف: ${p.description}\n`;
+          if (p.imageUrl) catalogContext += `     رابط الصورة: [MEDIA:${p.imageUrl}]\n`;
+        });
+        catalogContext += `توجيه حاسم: عند سؤال العميل عن أي من هذه المنتجات، قدم له السعر والمواصفات بحرارة وذكاء، واعرض صورة المنتج بصيغة [MEDIA:رابط الصورة].\n`;
+      }
+    }
+
+    // 🧠 Ultra Sales & Response Intelligence
+    const salesIntelligence =
+      `\n\n--- 🧠 توجيهات الذكاء الفائق وسرعة البديهة في خدمة العملاء والمبيعات ---\n` +
+      `1. سرعة البديهة والفهم: افهم مقصود العميل بدقة مهما كانت لهجته أو أسلوبه المختصر.\n` +
+      `2. الإجابة المباشرة أولاً: ابدأ دائماً بالجواب الشافي المباشر (السعر، التوفر، أو الخطوة التالية) دون لف أو دوران أو حشو.\n` +
+      `3. إتمام البيع والدفع (Closing): إذا قال العميل "بدي اشترك" أو "بدي ادفع" أو "كيف الطريقة"، لا تؤجل ولا تطلب منه معلومات زائدة؛ زوده فوراً بباركود الدفع والخطوات.\n` +
+      `4. الذكاء البصري: إذا أرسل العميل صورة إيصال، تحقق من المبلغ واشكره فوراً وطمئنه بأنه تم استلام الإيصال وجاري التفعيل.\n` +
+      `5. تجنب الغباء والتكرار: لا تقل أبداً "بصفتي ذكاء اصطناعي" أو "لا أعلم" طالما أن المعلومة موجودة في الكتالوج أو قاعدة المعرفة.\n`;
 
     const systemPrompt =
       basePrompt +
       humanStyleRules +
+      salesIntelligence +
       safetyContext +
       errorRecoveryContext +
       escalationContext +
       memoryContext +
       knowledgeContext +
+      catalogContext +
       skillsContext +
       visionContext;
 
@@ -500,7 +536,7 @@ export class GeminiService {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
       const res = await axios.post(url, requestPayload, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 20000,
+        timeout: 35000,
       });
 
       const candidate = res.data?.candidates?.[0];

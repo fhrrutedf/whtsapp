@@ -77,14 +77,25 @@ export class KnowledgeService {
    * Builds the formatted Knowledge Base context to inject into Gemini's system prompt.
    */
   public static getKnowledgeContext(tenantId: string): string {
-    let items = localStore.getKnowledgeItems(tenantId);
-    if ((!items || items.length === 0) && tenantId !== 'demo-tenant-1') {
-      items = localStore.getKnowledgeItems('demo-tenant-1');
+    // Gather all knowledge items across tenant IDs and deduplicate by title
+    const allCandidates = [
+      ...localStore.getKnowledgeItems(tenantId),
+      ...localStore.getKnowledgeItems('demo-tenant-1'),
+      ...localStore.getKnowledgeItems('8c579042-01a0-4736-87e0-a24e9d4e6c07'),
+      ...localStore.getKnowledgeItems('aaaaaaaa-0000-0000-0000-000000000001'),
+    ];
+
+    const seenTitles = new Set<string>();
+    const items: KnowledgeItem[] = [];
+    for (const item of allCandidates) {
+      const normalizedTitle = (item.title || '').trim().toLowerCase();
+      if (!seenTitles.has(normalizedTitle)) {
+        seenTitles.add(normalizedTitle);
+        items.push(item);
+      }
     }
-    if ((!items || items.length === 0) && tenantId !== '8c579042-01a0-4736-87e0-a24e9d4e6c07') {
-      items = localStore.getKnowledgeItems('8c579042-01a0-4736-87e0-a24e9d4e6c07');
-    }
-    if (!items || items.length === 0) return '';
+
+    if (items.length === 0) return '';
 
     const sections = items.map((item, index) => {
       const typeLabel =

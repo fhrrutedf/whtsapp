@@ -292,56 +292,65 @@ class LocalStoreManager {
     return this.data.messages[conversationId] || [];
   }
 
-  // --- Settings (Gemini, Persona, Delay, Handoff) ---
+  // --- Settings (Gemini, Persona, Delay, Handoff, Media, Skills) ---
   public getSettings(tenantId: string): StoredSettings {
-    const s = this.data.settings[tenantId];
-    const key = s?.geminiApiKey || process.env.GEMINI_API_KEY || '';
-    const rawModel = s?.geminiModel;
+    const s = this.data.settings[tenantId] || {};
+    const key = s.geminiApiKey || process.env.GEMINI_API_KEY || '';
+    const rawModel = s.geminiModel;
     const model = (!rawModel || rawModel === 'gemini-2.0-flash') ? 'gemini-2.5-flash' : rawModel;
 
     return {
+      ...s,
       geminiApiKey: key,
       geminiModel: model,
       geminiSystemPrompt:
-        s?.geminiSystemPrompt ||
-        'أنت مساعد خدمة عملاء محترف للرد على استفسارات العملاء بدقة وإيجاز واحترافية عالية عبر الواتساب.',
-      geminiAutoReplyEnabled: s?.geminiAutoReplyEnabled !== undefined ? s.geminiAutoReplyEnabled : true,
-      aiProvider: s?.aiProvider || 'gemini',
-      openrouterApiKey: s?.openrouterApiKey || process.env.OPENROUTER_API_KEY || '',
-      openrouterModel: s?.openrouterModel || 'google/gemini-2.5-flash',
-      dialect: s?.dialect || 'syrian',
-      tone: s?.tone || 'friendly',
-      customDialectPrompt: s?.customDialectPrompt || '',
-      excludedPhoneNumbers: s?.excludedPhoneNumbers || [],
-      autoReplyDelaySeconds: s?.autoReplyDelaySeconds !== undefined ? s.autoReplyDelaySeconds : 30,
-      interMessageDelaySeconds: s?.interMessageDelaySeconds !== undefined ? s.interMessageDelaySeconds : 15,
-      handoffKeywords: s?.handoffKeywords || ['موظف', 'بشري', 'شكوى', 'مدير', 'اتصال', 'تحويل', 'إلغاء'],
-      handoffMaxTurns: s?.handoffMaxTurns !== undefined ? s.handoffMaxTurns : 5,
+        s.geminiSystemPrompt ||
+        'أنت مساعد خدمة عملاء ومبيعات محترف للرد على استفسارات العملاء بدقة وإيجاز واحترافية عالية عبر الواتساب.',
+      geminiAutoReplyEnabled: s.geminiAutoReplyEnabled !== undefined ? s.geminiAutoReplyEnabled : true,
+      aiProvider: s.aiProvider || 'gemini',
+      openrouterApiKey: s.openrouterApiKey || process.env.OPENROUTER_API_KEY || '',
+      openrouterModel: s.openrouterModel || 'google/gemini-2.5-flash',
+      dialect: s.dialect || 'syrian',
+      tone: s.tone || 'friendly',
+      customDialectPrompt: s.customDialectPrompt || '',
+      excludedPhoneNumbers: s.excludedPhoneNumbers || [],
+      autoReplyDelaySeconds: s.autoReplyDelaySeconds !== undefined ? s.autoReplyDelaySeconds : 30,
+      interMessageDelaySeconds: s.interMessageDelaySeconds !== undefined ? s.interMessageDelaySeconds : 15,
+      handoffKeywords: s.handoffKeywords || ['موظف', 'بشري', 'شكوى', 'مدير', 'اتصال', 'تحويل', 'إلغاء'],
+      handoffMaxTurns: s.handoffMaxTurns !== undefined ? s.handoffMaxTurns : 5,
       handoffStopNotification:
-        s?.handoffStopNotification ||
+        s.handoffStopNotification ||
         'تم تحويل محادثتك إلى أحد موظفي خدمة العملاء وسيقوم بالرد عليك مباشرة في أقرب وقت ممكن. شكراً لصبرك!',
-      pausedConversations: s?.pausedConversations || [],
-      userMemoryEnabled: s?.userMemoryEnabled !== undefined ? s.userMemoryEnabled : true,
+      pausedConversations: s.pausedConversations || [],
+      userMemoryEnabled: s.userMemoryEnabled !== undefined ? s.userMemoryEnabled : true,
       userMemoryPrompt:
-        s?.userMemoryPrompt ||
-        'Remember durable, useful facts about this user so future conversations feel continuous and personalized across sessions — their explicit preferences, how they like to be addressed (name / preferred surname), their language, country and timezone, and any stated communication preferences or recurring needs. Focus on information that stays true over time and helps you serve them better next time. Do NOT store sensitive or regulated information — passwords, full credit-card or payment details, government IDs, health data, or similar — unless the user has explicitly asked you to remember it.',
-      sendReadReceipts: s?.sendReadReceipts !== undefined ? s.sendReadReceipts : false,
+        s.userMemoryPrompt ||
+        'Remember durable, useful facts about this user so future conversations feel continuous and personalized across sessions.',
+      sendReadReceipts: s.sendReadReceipts !== undefined ? s.sendReadReceipts : false,
       safetyGuardrails:
-        s?.safetyGuardrails ||
-        'لا تجمع أبداً عبر الدردشة بيانات حساسة: رقم بطاقة كامل، كلمات مرور، مفاتيح API، أو رموز OTP/صور، أو أكواد التحقق، أرقام هويات حكومية كاملة. لا تدّعي أنك تحققت من هوية المستخدم بنفسك. لا تؤكد أي معلومة غير موجودة بقاعدة المعرفة ولا تخمّن (خصوصاً السعر الأصلي المتضارب، التقسيط، أو أي تفاصيل تشغيلية غير مذكورة). عند نقص/تعارض المعلومات استخدم عبارة التحقق المحددة من أستاذ نواف، واصعّد مع تلخيص واضح لسؤال المستخدم وسياق المحادثة. لا توجّه المستخدم لموقع إلكتروني/رابط حجز غير مؤكد لأنه لا يوجد موقع مثبت.',
+        s.safetyGuardrails ||
+        'لا تجمع أبداً عبر الدردشة بيانات حساسة: رقم بطاقة كامل، كلمات مرور، مفاتيح API، أو رموز OTP/صور، أو أكواد التحقق.',
       errorRecovery:
-        s?.errorRecovery ||
-        'إذا صار خطأ أو تعثّر تقني، اعتذر باختصار وجرّب مرة ثانية أو اقترح خطوة بديلة بسيطة (مثلاً إعادة المحاولة على تيليجرام/تأكيد نوع الجهاز). لا تذكر تفاصيل داخلية أو أسماء أدوات/أخطاء نظام. إذا استمرّت المشكلة أو كانت خارج قاعدة المعرفة، اعرض تحويلها للمدرب مع تلخيص للسياق.',
-      escalationEnabled: s?.escalationEnabled !== undefined ? s.escalationEnabled : true,
+        s.errorRecovery ||
+        'إذا صار خطأ أو تعثّر تقني، اعتذر باختصار وجرّب مرة ثانية أو اقترح خطوة بديلة بسيطة.',
+      escalationEnabled: s.escalationEnabled !== undefined ? s.escalationEnabled : true,
       escalationRules:
-        s?.escalationRules ||
-        'Escalate when:\n\n- Human request: Hand off immediately when the customer asks for a human.\n- High-stakes topics: Always hand off for Refunds & cancellations; Billing disputes; Account security; Legal & compliance; Outages & incidents; Enterprise contracts; اذا طلب دفع.\n- Failed resolution: Escalate after 2 failed attempts.\n- Frustration signals: Hand off for Repeated complaint.',
+        s.escalationRules ||
+        'Escalate when:\n\n- Human request: Hand off immediately when the customer asks for a human.',
       escalationPreActions:
-        s?.escalationPreActions ||
+        s.escalationPreActions ||
         'Collect relevant context, complete any checks, and set expectations.',
       outOfOfficeMessage:
-        s?.outOfOfficeMessage ||
-        'مرحباً بك! فريق خدمة العملاء غير متواجد حالياً خارج أوقات العمل الرسمية. تم تسجيل استفسارك وسيقوم موظفنا بالتواصل معك في أقرب وقت مع بداية دوام العمل القادم. شكراً لتفهمك!',
+        s.outOfOfficeMessage ||
+        'مرحباً بك! فريق خدمة العملاء غير متواجد حالياً خارج أوقات العمل الرسمية.',
+      brochureImageUrl: s.brochureImageUrl,
+      paymentQrImageUrl: s.paymentQrImageUrl,
+      catalogImageUrl: s.catalogImageUrl,
+      products: s.products || [],
+      enabledSkills: s.enabledSkills || [],
+      checkoutBaseUrl: s.checkoutBaseUrl,
+      meetingSchedulerUrl: s.meetingSchedulerUrl,
+      defaultDiscountPercentage: s.defaultDiscountPercentage || 10,
     };
   }
 

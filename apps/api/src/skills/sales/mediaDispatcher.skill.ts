@@ -66,10 +66,18 @@ export class MediaDispatcherSkill extends BaseSkill {
       case 'catalog':
       case 'product_photo':
       default:
-        mediaUrl = (settings as any)?.catalogImageUrl || `${apiBase}/media/catalog/products_overview.png`;
-        defaultCaption = args.productName
-          ? `تفضل صورة تفاصيل ${args.productName}، متاح وجاهز للتوصيل الفوري!`
-          : 'تفضل صور وتفاصيل منتجاتنا المميزة. تحب تعرف تفاصيل أكثر عن صنف معين؟';
+        const matchedProd = (settings.products || []).find((p) =>
+          args.productName && p.name.toLowerCase().includes(args.productName.toLowerCase())
+        );
+        if (matchedProd && matchedProd.imageUrl) {
+          mediaUrl = matchedProd.imageUrl;
+          defaultCaption = `تفضل صورة ${matchedProd.name} (السعر: ${matchedProd.price || ''} ريال). ${matchedProd.description ? matchedProd.description + '. ' : ''}تحب نعتمد لك الطلب ونجهزه للشحن؟`;
+        } else {
+          mediaUrl = (settings as any)?.catalogImageUrl || (settings.products?.[0]?.imageUrl) || `${apiBase}/media/brochures/omni_packages.png`;
+          defaultCaption = args.productName
+            ? `تفضل صورة وتفاصيل ${args.productName}، متاح وجاهز للطلب الفوري!`
+            : 'تفضل صور وتفاصيل منتجاتنا المميزة. تحب تعرف تفاصيل أكثر عن صنف معين؟';
+        }
         break;
     }
 
