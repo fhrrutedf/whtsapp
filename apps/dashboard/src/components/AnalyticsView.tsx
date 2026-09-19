@@ -143,7 +143,7 @@ export function AnalyticsView() {
               <span className="text-xs font-semibold">رصيد الرموز (AI Tokens)</span>
               <Coins className="w-4 h-4 text-cyan-400" />
             </div>
-            <div className="text-2xl font-black text-cyan-400 tabular-nums">{billing.tokenBalance.toLocaleString()}</div>
+            <div className="text-2xl font-black text-cyan-400 tabular-nums" suppressHydrationWarning>{billing.tokenBalance.toLocaleString('en-US')}</div>
             <div className="text-[11px] text-cyan-300/80 font-medium flex items-center gap-1 mt-2">
               <span>الباقة: {billing.planName} ({billing.status})</span>
             </div>

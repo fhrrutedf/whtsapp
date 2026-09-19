@@ -57,6 +57,11 @@ export function KnowledgeSettings() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadKnowledge = async () => {
     setKnowledgeLoading(true);
@@ -257,11 +262,15 @@ export function KnowledgeSettings() {
           <div className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center gap-2">
             <Database className="w-4 h-4 text-emerald-400" />
             <span className="text-slate-400">المصادر النشطة:</span>
-            <span className="font-bold text-slate-200 tabular-nums">{knowledgeItems.length}</span>
+            <span className="font-bold text-slate-200 tabular-nums" suppressHydrationWarning>
+              {mounted ? knowledgeItems.length : 0}
+            </span>
           </div>
           <div className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs flex items-center gap-2">
             <span className="text-slate-400">إجمالي الحروف:</span>
-            <span className="font-bold text-emerald-300 tabular-nums">{totalChars.toLocaleString()}</span>
+            <span className="font-bold text-emerald-300 tabular-nums" suppressHydrationWarning>
+              {mounted ? totalChars.toLocaleString('en-US') : 0}
+            </span>
           </div>
         </div>
       </div>
@@ -428,8 +437,8 @@ export function KnowledgeSettings() {
 
             {fileContent && (
               <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-400 font-mono max-h-28 overflow-y-auto">
-                <span className="text-emerald-400 font-sans block mb-1">
-                  معاينة محتوى الملف ({fileContent.length.toLocaleString()} حرف):
+                <span className="text-emerald-400 font-sans block mb-1" suppressHydrationWarning>
+                  معاينة محتوى الملف ({fileContent.length.toLocaleString('en-US')} حرف):
                 </span>
                 {fileContent.slice(0, 300)}...
               </div>
@@ -596,8 +605,8 @@ export function KnowledgeSettings() {
                           <h4 className="text-xs font-bold text-slate-200 truncate">
                             {item.title}
                           </h4>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono tabular-nums">
-                            {item.charCount ? `${item.charCount.toLocaleString()} حرف` : ''}
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono tabular-nums" suppressHydrationWarning>
+                            {item.charCount ? `${item.charCount.toLocaleString('en-US')} حرف` : ''}
                           </span>
                         </div>
                         {item.source && (

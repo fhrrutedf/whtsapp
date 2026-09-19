@@ -1286,8 +1286,8 @@ export function SettingsView() {
               <div className="flex items-center gap-1.5 text-slate-300">
                 <Layers className="w-4 h-4 text-teal-400" />
                 <span>إجمالي النصوص:</span>
-                <span className="font-mono font-bold text-slate-200">
-                  {totalChars.toLocaleString()} حرف
+                <span className="font-mono font-bold text-slate-200" suppressHydrationWarning>
+                  {totalChars.toLocaleString('en-US')} حرف
                 </span>
               </div>
             </div>
@@ -1549,8 +1549,8 @@ export function SettingsView() {
                               <h4 className="text-xs font-bold text-slate-200 truncate">
                                 {item.title}
                               </h4>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">
-                                {item.charCount ? `${item.charCount.toLocaleString()} حرف` : ''}
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono" suppressHydrationWarning>
+                                {item.charCount ? `${item.charCount.toLocaleString('en-US')} حرف` : ''}
                               </span>
                             </div>
                             {item.source && (
