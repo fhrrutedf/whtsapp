@@ -1,6 +1,25 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { 
+  TrendingUp, 
+  Search, 
+  RefreshCw, 
+  Users, 
+  Flame, 
+  CreditCard, 
+  Sparkles, 
+  ArrowRight, 
+  ChevronRight, 
+  Phone, 
+  Globe, 
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  BrainCircuit,
+  MessageSquare
+} from "lucide-react";
 
 interface Lead {
   id: string;
@@ -20,13 +39,13 @@ interface Lead {
   courseDeliveredAt?: string;
 }
 
-const INTEREST_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  HOT:          { label: "مهتم جداً 🔥",   color: "#ef4444", bg: "#fef2f2" },
-  WARM:         { label: "مهتم ✨",          color: "#f59e0b", bg: "#fffbeb" },
-  COLD:         { label: "بارد ❄️",          color: "#3b82f6", bg: "#eff6ff" },
-  PAID:         { label: "دفع 💳",           color: "#10b981", bg: "#f0fdf4" },
-  UNINTERESTED: { label: "غير مهتم ❌",      color: "#6b7280", bg: "#f9fafb" },
-  UNKNOWN:      { label: "جديد 🆕",          color: "#8b5cf6", bg: "#f5f3ff" },
+const INTEREST_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  HOT:          { label: "مهتم جداً 🔥",   color: "text-rose-400", bg: "bg-rose-500/15", border: "border-rose-500/30" },
+  WARM:         { label: "مهتم ✨",          color: "text-amber-400", bg: "bg-amber-500/15", border: "border-amber-500/30" },
+  COLD:         { label: "بارد ❄️",          color: "text-cyan-400", bg: "bg-cyan-500/15", border: "border-cyan-500/30" },
+  PAID:         { label: "دفع 💳",           color: "text-emerald-400", bg: "bg-emerald-500/15", border: "border-emerald-500/30" },
+  UNINTERESTED: { label: "غير مهتم ❌",      color: "text-slate-400", bg: "bg-white/[0.05]", border: "border-white/10" },
+  UNKNOWN:      { label: "جديد 🆕",          color: "text-violet-400", bg: "bg-violet-500/15", border: "border-violet-500/30" },
 };
 
 const COUNTRY_FLAGS: Record<string, string> = {
@@ -38,18 +57,20 @@ const COUNTRY_FLAGS: Record<string, string> = {
 
 function formatDate(iso?: string) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("ar-SY", { year:"numeric", month:"short", day:"numeric" });
+  return new Date(iso).toLocaleDateString("ar-SY", { year: "numeric", month: "short", day: "numeric" });
 }
 
 function ScoreBadge({ score }: { score?: number }) {
   const s = score ?? 0;
-  const color = s >= 70 ? "#ef4444" : s >= 40 ? "#f59e0b" : "#6b7280";
+  const barColor = s >= 70 ? "bg-rose-500" : s >= 40 ? "bg-amber-500" : "bg-slate-500";
+  const textColor = s >= 70 ? "text-rose-400" : s >= 40 ? "text-amber-400" : "text-slate-400";
+
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-      <div style={{ width:60, height:6, background:"#e5e7eb", borderRadius:999, overflow:"hidden" }}>
-        <div style={{ width:`${s}%`, height:"100%", background:color, borderRadius:999 }} />
+    <div className="flex items-center gap-2">
+      <div className="w-16 h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
+        <div className={`h-full ${barColor} rounded-full transition-all duration-300`} style={{ width: `${s}%` }} />
       </div>
-      <span style={{ fontSize:12, color, fontWeight:600 }}>{s}</span>
+      <span className={`text-xs font-mono font-bold ${textColor}`}>{s}</span>
     </div>
   );
 }
@@ -60,7 +81,7 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
   const [filterLevel, setFilterLevel] = useState<string>("ALL");
-  const [stats, setStats] = useState({ total:0, hot:0, paid:0, warm:0 });
+  const [stats, setStats] = useState({ total: 0, hot: 0, paid: 0, warm: 0 });
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -75,11 +96,16 @@ export default function LeadsPage() {
         paid: data.filter((l) => l.interestLevel === "PAID").length,
         warm: data.filter((l) => l.interestLevel === "WARM").length,
       });
-    } catch { setLeads([]); }
-    finally { setLoading(false); }
+    } catch { 
+      setLeads([]); 
+    } finally { 
+      setLoading(false); 
+    }
   }, []);
 
-  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+  useEffect(() => { 
+    fetchLeads(); 
+  }, [fetchLeads]);
 
   useEffect(() => {
     let result = leads;
@@ -97,118 +123,280 @@ export default function LeadsPage() {
   }, [leads, search, filterLevel]);
 
   const displayName = (lead: Lead) =>
-    lead.name && lead.name !== lead.phoneNumber ? lead.name
-    : lead.whatsappPushName || lead.phoneNumber || "—";
+    lead.name && lead.name !== lead.phoneNumber 
+      ? lead.name 
+      : lead.whatsappPushName || lead.phoneNumber || "—";
 
   return (
-    <div style={{ padding:"24px 32px", fontFamily:"Cairo,Tajawal,sans-serif", direction:"rtl", minHeight:"100vh", background:"#f8fafc" }}>
-      <div style={{ marginBottom:28 }}>
-        <h1 style={{ fontSize:26, fontWeight:800, color:"#0f172a", margin:0 }}>📊 إدارة العملاء المحتملين — CRM</h1>
-        <p style={{ color:"#64748b", marginTop:4, fontSize:14 }}>تتبع كامل لكل عميل — مستوى الاهتمام، الدولة، وحالة الدفع</p>
-      </div>
+    <div className="min-h-screen bg-[#060911] text-slate-100 font-sans select-none" dir="rtl">
+      {/* Top Header Bar */}
+      <header className="h-16 px-6 lg:px-10 border-b border-white/[0.07] bg-[#090d16]/90 backdrop-blur-2xl flex items-center justify-between sticky top-0 z-30 shadow-xl">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="p-2 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-400 hover:text-white border border-white/[0.08] transition flex items-center gap-1 text-xs font-bold"
+            title="العودة لصندوق المحادثات"
+          >
+            <ChevronRight className="w-4 h-4" />
+            <span>العودة للدردشة</span>
+          </Link>
 
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16, marginBottom:24 }}>
-        {[
-          { label:"إجمالي العملاء", value:stats.total, icon:"👥", color:"#6366f1" },
-          { label:"مهتمون جداً", value:stats.hot, icon:"🔥", color:"#ef4444" },
-          { label:"دفعوا", value:stats.paid, icon:"💳", color:"#10b981" },
-          { label:"مهتمون", value:stats.warm, icon:"✨", color:"#f59e0b" },
-        ].map((s) => (
-          <div key={s.label} style={{ background:"#fff", borderRadius:16, padding:"20px 24px", boxShadow:"0 1px 3px rgba(0,0,0,0.08)", border:"1px solid #e2e8f0" }}>
-            <div style={{ fontSize:28 }}>{s.icon}</div>
-            <div style={{ fontSize:32, fontWeight:800, color:s.color }}>{s.value}</div>
-            <div style={{ fontSize:13, color:"#64748b" }}>{s.label}</div>
+          <div className="h-4 w-[1px] bg-white/10" />
+
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <h1 className="text-sm font-black text-white tracking-tight">
+                إدارة العملاء والمهتمين • CRM Leads
+              </h1>
+              <p className="text-[10px] text-slate-400 hidden sm:block">
+                تصنيف ذكي لمستوى الاهتمام، رصد الدول، وتتبع المدفوعات آلياً
+              </p>
+            </div>
           </div>
-        ))}
-      </div>
-
-      <div style={{ display:"flex", gap:12, marginBottom:20, flexWrap:"wrap" }}>
-        <input placeholder="🔍 بحث بالاسم أو الرقم أو الدولة..." value={search} onChange={(e) => setSearch(e.target.value)}
-          style={{ flex:1, minWidth:240, padding:"10px 16px", borderRadius:10, border:"1px solid #e2e8f0", fontSize:14, outline:"none", background:"#fff", fontFamily:"inherit" }} />
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {["ALL","HOT","WARM","COLD","PAID","UNINTERESTED","UNKNOWN"].map((level) => (
-            <button key={level} onClick={() => setFilterLevel(level)} style={{
-              padding:"8px 16px", borderRadius:20, border:"none", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit",
-              background: filterLevel===level ? (INTEREST_CONFIG[level]?.bg||"#f1f5f9") : "#fff",
-              color: filterLevel===level ? (INTEREST_CONFIG[level]?.color||"#334155") : "#64748b",
-              boxShadow: filterLevel===level ? "0 0 0 2px "+(INTEREST_CONFIG[level]?.color||"#6366f1") : "0 1px 2px rgba(0,0,0,0.06)",
-            }}>
-              {level==="ALL" ? `الكل (${leads.length})` : INTEREST_CONFIG[level]?.label||level}
-            </button>
-          ))}
         </div>
-        <button onClick={fetchLeads} style={{ padding:"8px 18px", borderRadius:10, border:"none", cursor:"pointer", background:"#6366f1", color:"#fff", fontSize:13, fontWeight:600, fontFamily:"inherit" }}>↻ تحديث</button>
-      </div>
 
-      <div style={{ background:"#fff", borderRadius:16, boxShadow:"0 1px 3px rgba(0,0,0,0.08)", border:"1px solid #e2e8f0", overflow:"hidden" }}>
-        {loading ? (
-          <div style={{ padding:60, textAlign:"center", color:"#94a3b8", fontSize:16 }}>⏳ جاري تحميل البيانات...</div>
-        ) : filtered.length===0 ? (
-          <div style={{ padding:60, textAlign:"center", color:"#94a3b8", fontSize:16 }}>لا يوجد عملاء مطابقين</div>
-        ) : (
-          <div style={{ overflowX:"auto" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse" }}>
-              <thead>
-                <tr style={{ background:"#f8fafc", borderBottom:"2px solid #e2e8f0" }}>
-                  {["الاسم","رقم الهاتف","الدولة","مستوى الاهتمام","النقاط","ملاحظة الذكاء","تاريخ التواصل","الدفع","الحالة"].map((h) => (
-                    <th key={h} style={{ padding:"14px 16px", textAlign:"right", fontSize:13, fontWeight:700, color:"#475569", whiteSpace:"nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((lead, i) => {
-                  const cfg = INTEREST_CONFIG[lead.interestLevel||"UNKNOWN"];
-                  const flag = lead.countryCode ? (COUNTRY_FLAGS[lead.countryCode]||"🌍") : "🌍";
-                  return (
-                    <tr key={lead.id} style={{ borderBottom:"1px solid #f1f5f9", background: i%2===0?"#fff":"#fafafa" }}
-                      onMouseEnter={(e)=>(e.currentTarget.style.background="#f0f9ff")}
-                      onMouseLeave={(e)=>(e.currentTarget.style.background=i%2===0?"#fff":"#fafafa")}>
-                      <td style={{ padding:"14px 16px", whiteSpace:"nowrap" }}>
-                        <div style={{ fontWeight:700, fontSize:14, color:"#0f172a" }}>{displayName(lead)}</div>
-                        {lead.whatsappPushName && lead.name && lead.name!==lead.phoneNumber && (
-                          <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>واتساب: {lead.whatsappPushName}</div>
-                        )}
-                      </td>
-                      <td style={{ padding:"14px 16px" }}>
-                        <span style={{ fontFamily:"monospace", fontSize:13, color:"#334155", direction:"ltr", display:"inline-block" }}>{lead.phoneNumber||"—"}</span>
-                      </td>
-                      <td style={{ padding:"14px 16px", whiteSpace:"nowrap" }}>
-                        <span style={{ fontSize:20 }}>{flag}</span>{" "}
-                        <span style={{ fontSize:13, color:"#475569" }}>{lead.countryName||"—"}</span>
-                      </td>
-                      <td style={{ padding:"14px 16px" }}>
-                        <span style={{ display:"inline-flex", alignItems:"center", gap:4, padding:"4px 12px", borderRadius:20, fontSize:12, fontWeight:700, background:cfg?.bg||"#f1f5f9", color:cfg?.color||"#64748b" }}>
-                          {cfg?.label||lead.interestLevel}
-                        </span>
-                      </td>
-                      <td style={{ padding:"14px 16px" }}><ScoreBadge score={lead.interestScore} /></td>
-                      <td style={{ padding:"14px 16px", maxWidth:200 }}>
-                        <div style={{ fontSize:12, color:"#64748b", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{lead.interestNotes||"—"}</div>
-                        {lead.memoryFacts && lead.memoryFacts.length > 0 && <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>🧠 {lead.memoryFacts.length} ذكريات</div>}
-                      </td>
-                      <td style={{ padding:"14px 16px", whiteSpace:"nowrap" }}>
-                        <div style={{ fontSize:13, color:"#475569" }}>{formatDate(lead.lastSeenAt||lead.firstContactAt)}</div>
-                      </td>
-                      <td style={{ padding:"14px 16px", whiteSpace:"nowrap" }}>
-                        {lead.paidAt ? <span style={{ color:"#10b981", fontWeight:700, fontSize:13 }}>✅ {formatDate(lead.paidAt)}</span>
-                          : <span style={{ color:"#cbd5e1", fontSize:13 }}>—</span>}
-                      </td>
-                      <td style={{ padding:"14px 16px" }}>
-                        {lead.isOptedOut ? <span style={{ color:"#ef4444", fontSize:12, fontWeight:600 }}>⛔ أوقف</span>
-                          : lead.courseDeliveredAt ? <span style={{ color:"#10b981", fontSize:12, fontWeight:600 }}>✅ استلم الكورس</span>
-                          : <span style={{ color:"#94a3b8", fontSize:12 }}>—</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <button
+          onClick={fetchLeads}
+          disabled={loading}
+          className="p-2.5 px-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] text-slate-200 border border-white/[0.08] transition flex items-center gap-2 text-xs font-bold"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-emerald-400" : ""}`} />
+          <span>تحديث</span>
+        </button>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
+        
+        {/* KPI Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="p-5 rounded-3xl bg-[#0c1322] border border-white/10 shadow-xl relative overflow-hidden group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-slate-400">إجمالي العملاء</span>
+              <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <Users className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-3xl font-black text-white tracking-tight">{stats.total}</div>
+            <div className="text-[11px] text-slate-500 mt-1">مسجلون في قاعدة البيانات</div>
           </div>
-        )}
-      </div>
-      <div style={{ marginTop:16, fontSize:12, color:"#94a3b8", textAlign:"center" }}>
-        يتم تحديث مستوى الاهتمام تلقائياً بعد كل محادثة
-      </div>
+
+          <div className="p-5 rounded-3xl bg-[#0c1322] border border-rose-500/30 shadow-xl relative overflow-hidden group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-rose-300">مهتمون جداً (Hot)</span>
+              <div className="w-9 h-9 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center">
+                <Flame className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-3xl font-black text-rose-400 tracking-tight">{stats.hot}</div>
+            <div className="text-[11px] text-rose-400/60 mt-1">فرص إغلاق مبيعات وشيكة 🔥</div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-[#0c1322] border border-emerald-500/30 shadow-xl relative overflow-hidden group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-emerald-300">دفعوا واشتركوا</span>
+              <div className="w-9 h-9 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                <CreditCard className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-3xl font-black text-emerald-400 tracking-tight">{stats.paid}</div>
+            <div className="text-[11px] text-emerald-400/60 mt-1">تم تأكيد الدفع واستلام المحتوى 💳</div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-[#0c1322] border border-amber-500/30 shadow-xl relative overflow-hidden group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-bold text-amber-300">مهتمون (Warm)</span>
+              <div className="w-9 h-9 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+                <Sparkles className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="text-3xl font-black text-amber-400 tracking-tight">{stats.warm}</div>
+            <div className="text-[11px] text-amber-400/60 mt-1">تفاعلوا بإيجابية مع العروض ✨</div>
+          </div>
+        </div>
+
+        {/* Filter and Search Bar */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 justify-between">
+          <div className="relative w-full sm:w-96">
+            <Search className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              placeholder="🔍 بحث بالاسم، رقم الهاتف، أو الدولة..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-[#0c1322] border border-white/10 rounded-2xl pr-10 pl-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 shadow-inner"
+            />
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 no-scrollbar text-xs">
+            {["ALL", "HOT", "WARM", "COLD", "PAID", "UNINTERESTED", "UNKNOWN"].map((level) => {
+              const cfg = INTEREST_CONFIG[level];
+              const isSelected = filterLevel === level;
+              const count = level === "ALL" ? leads.length : leads.filter((l) => l.interestLevel === level).length;
+
+              return (
+                <button
+                  key={level}
+                  onClick={() => setFilterLevel(level)}
+                  className={`px-3 py-1.5 rounded-xl border font-bold transition whitespace-nowrap text-xs ${
+                    isSelected
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm"
+                      : "bg-[#0c1322] text-slate-400 hover:text-white border-white/[0.08]"
+                  }`}
+                >
+                  {level === "ALL" ? `الكل (${count})` : `${cfg?.label || level} (${count})`}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* CRM Table */}
+        <div className="bg-[#0c1322] border border-white/10 rounded-3xl shadow-2xl overflow-hidden">
+          {loading ? (
+            <div className="py-24 text-center text-slate-500 flex flex-col items-center gap-3">
+              <RefreshCw className="w-8 h-8 animate-spin text-emerald-400/60" />
+              <span className="text-sm">جاري تحميل بيانات العملاء...</span>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-20 text-center text-slate-500 space-y-2">
+              <Users className="w-10 h-10 mx-auto opacity-40 text-slate-400" />
+              <div className="text-sm font-bold text-slate-300">لا يوجد عملاء مطابقين للبحث</div>
+              <div className="text-xs text-slate-500">جرب البحث بكلمة أخرى أو تغيير تصفية مستوى الاهتمام</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-right border-collapse">
+                <thead>
+                  <tr className="bg-[#090d16]/90 border-b border-white/[0.08] text-slate-400 text-xs font-bold">
+                    <th className="py-4 px-5 whitespace-nowrap">الاسم الحقيقي للعميل</th>
+                    <th className="py-4 px-5 whitespace-nowrap">رقم الهاتف</th>
+                    <th className="py-4 px-5 whitespace-nowrap">الدولة</th>
+                    <th className="py-4 px-5 whitespace-nowrap">مستوى الاهتمام</th>
+                    <th className="py-4 px-5 whitespace-nowrap">النقاط</th>
+                    <th className="py-4 px-5 whitespace-nowrap">ملاحظات الذكاء الاصطناعي</th>
+                    <th className="py-4 px-5 whitespace-nowrap">آخر تواصل</th>
+                    <th className="py-4 px-5 whitespace-nowrap">حالة الدفع</th>
+                    <th className="py-4 px-5 whitespace-nowrap">الكورس</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04] text-xs">
+                  {filtered.map((lead, i) => {
+                    const cfg = INTEREST_CONFIG[lead.interestLevel || "UNKNOWN"] || INTEREST_CONFIG.UNKNOWN;
+                    const flag = lead.countryCode ? (COUNTRY_FLAGS[lead.countryCode] || "🌍") : "🌍";
+
+                    return (
+                      <tr 
+                        key={lead.id} 
+                        className={`hover:bg-white/[0.03] transition-colors ${
+                          i % 2 === 0 ? "bg-transparent" : "bg-white/[0.01]"
+                        }`}
+                      >
+                        {/* Name */}
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          <div className="font-bold text-white text-sm">
+                            {displayName(lead)}
+                          </div>
+                          {lead.whatsappPushName && lead.name && lead.name !== lead.phoneNumber && (
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              واتساب: {lead.whatsappPushName}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Phone */}
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          <span className="font-mono text-xs text-slate-300 direction-ltr inline-block tracking-wider">
+                            {lead.phoneNumber || "—"}
+                          </span>
+                        </td>
+
+                        {/* Country */}
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white/[0.04] border border-white/[0.08]">
+                            <span className="text-base">{flag}</span>
+                            <span className="text-xs font-semibold text-slate-300">
+                              {lead.countryName || "غير محدد"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Interest Level */}
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                            <span>{cfg.label}</span>
+                          </span>
+                        </td>
+
+                        {/* Score */}
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          <ScoreBadge score={lead.interestScore} />
+                        </td>
+
+                        {/* AI Notes & Memory Facts */}
+                        <td className="py-3.5 px-5 max-w-xs">
+                          <div className="text-xs text-slate-300 truncate" title={lead.interestNotes || ""}>
+                            {lead.interestNotes || "—"}
+                          </div>
+                          {lead.memoryFacts && lead.memoryFacts.length > 0 && (
+                            <div className="flex items-center gap-1 text-[10px] text-violet-400 mt-1">
+                              <BrainCircuit className="w-3 h-3" />
+                              <span>{lead.memoryFacts.length} حقائق في الذاكرة</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Last Seen */}
+                        <td className="py-3.5 px-5 whitespace-nowrap text-slate-400">
+                          {formatDate(lead.lastSeenAt || lead.firstContactAt)}
+                        </td>
+
+                        {/* Paid */}
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          {lead.paidAt ? (
+                            <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{formatDate(lead.paidAt)}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 font-mono">—</span>
+                          )}
+                        </td>
+
+                        {/* Course Delivery */}
+                        <td className="py-3.5 px-5 whitespace-nowrap">
+                          {lead.isOptedOut ? (
+                            <span className="text-rose-400 font-semibold text-[11px] inline-flex items-center gap-1">
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span>أوقف المتابعة</span>
+                            </span>
+                          ) : lead.courseDeliveredAt ? (
+                            <span className="text-emerald-400 font-semibold text-[11px] inline-flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>تم التسليم</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">قيد المتابعة</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Footer info */}
+        <div className="text-center text-xs text-slate-500 py-4">
+          يتم تحليل مستوى اهتمام العميل وتحديث نقاطه وذاكرته تلقائياً بواسطة الذكاء الاصطناعي أثناء محادثات واتساب
+        </div>
+      </main>
     </div>
   );
 }

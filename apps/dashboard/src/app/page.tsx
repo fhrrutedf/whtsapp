@@ -166,8 +166,8 @@ export default function DashboardPage() {
                 return (
                   <Link
                     key={item.id}
-                    href="/giveaways"
-                    className="group relative w-full h-12 rounded-2xl flex items-center justify-center transition-all duration-200 text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 border border-transparent"
+                    href="/settings/giveaways"
+                    className="group relative w-full h-12 rounded-2xl flex items-center justify-center transition-all duration-200 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-transparent"
                     title={`${item.label} (${item.subLabel})`}
                   >
                     <Icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />

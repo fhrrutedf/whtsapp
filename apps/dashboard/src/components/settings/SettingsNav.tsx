@@ -12,7 +12,8 @@ import {
   Users, 
   ShieldCheck, 
   ChevronLeft,
-  Sparkles
+  Sparkles,
+  Gift
 } from 'lucide-react';
 
 interface SettingsNavItem {
@@ -36,6 +37,13 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     subLabel: 'AI Engine & Skills',
     icon: Bot,
     badge: 'Dual AI',
+  },
+  {
+    href: '/settings/giveaways',
+    label: 'الهدايا والمسابقات الأسبوعية',
+    subLabel: 'Giveaways & Weekly Contests',
+    icon: Gift,
+    badge: 'هدايا AI',
   },
   {
     href: '/settings/knowledge',
