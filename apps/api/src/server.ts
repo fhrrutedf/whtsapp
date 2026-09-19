@@ -484,7 +484,7 @@ app.delete('/api/settings/media/products/:productId', async (req: Request, res: 
 });
 
 // REST: Update Settings (Gemini config & AI agent settings)
-app.post('/api/settings', async (req: Request, res: Response) => {
+const handleUpdateSettings = async (req: Request, res: Response) => {
   const rawTenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
   const updated = localStore.updateSettings(rawTenantId, req.body);
 
@@ -495,7 +495,7 @@ app.post('/api/settings', async (req: Request, res: Response) => {
       localStore.updateSettings(tenantId, req.body);
     }
     const provider = req.body.aiProvider === 'openrouter' ? 'OPENROUTER' : 'GEMINI';
-    const modelName = req.body.aiProvider === 'openrouter' ? req.body.openrouterModel : (req.body.geminiModel || 'gemini-2.5-flash');
+    const modelName = req.body.aiProvider === 'openrouter' ? req.body.openrouterModel : (req.body.geminiModel || 'gemini-3.6-flash');
 
     await prisma.tenant.upsert({
       where: { id: tenantId },
@@ -521,7 +521,7 @@ app.post('/api/settings', async (req: Request, res: Response) => {
       create: {
         tenantId,
         provider,
-        modelName: modelName || 'gemini-2.5-flash',
+        modelName: modelName || 'gemini-3.6-flash',
         systemPrompt: req.body.geminiSystemPrompt || '',
         isActive: req.body.geminiAutoReplyEnabled !== false,
         dialect: req.body.dialect || 'syrian',
@@ -543,7 +543,7 @@ app.post('/api/settings', async (req: Request, res: Response) => {
         userMemoryPrompt: req.body.userMemoryPrompt || null,
       },
       update: {
-        modelName: modelName || 'gemini-2.5-flash',
+        modelName: modelName || 'gemini-3.6-flash',
         systemPrompt: req.body.geminiSystemPrompt || '',
         isActive: req.body.geminiAutoReplyEnabled !== false,
         dialect: req.body.dialect || 'syrian',
@@ -571,6 +571,20 @@ app.post('/api/settings', async (req: Request, res: Response) => {
   }
 
   res.status(200).json(updated);
+};
+
+app.post('/api/settings', handleUpdateSettings);
+app.put('/api/settings', handleUpdateSettings);
+
+// REST: Universal Test AI Provider & Agent Endpoint Connection
+app.post('/api/settings/ai/test', async (req: Request, res: Response) => {
+  try {
+    const { provider, apiKey, baseUrl, model } = req.body;
+    const result = await GeminiService.testAiConnection({ provider, apiKey, baseUrl, model });
+    res.status(200).json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // REST: Pause AI Auto-Reply for a conversation

@@ -45,10 +45,19 @@ export interface StoredSettings {
   geminiModel?: string;
   geminiSystemPrompt?: string;
   geminiAutoReplyEnabled?: boolean;
-  // AI Provider & Keys
-  aiProvider?: 'gemini' | 'openrouter';
+  // AI Provider & Keys (Universal AI Engine)
+  aiProvider?: 'gemini' | 'openai' | 'openrouter' | 'groq' | 'deepseek' | 'custom';
   openrouterApiKey?: string;
   openrouterModel?: string;
+  openaiApiKey?: string;
+  openaiModel?: string;
+  groqApiKey?: string;
+  groqModel?: string;
+  deepseekApiKey?: string;
+  deepseekModel?: string;
+  customApiBaseUrl?: string;
+  customApiKey?: string;
+  customModel?: string;
   // 1. Dialect & Tone
   dialect?: 'modern_standard' | 'syrian' | 'saudi' | 'egyptian' | 'iraqi' | 'custom';
   tone?: 'friendly' | 'formal' | 'sales' | 'concise' | 'empathetic';
