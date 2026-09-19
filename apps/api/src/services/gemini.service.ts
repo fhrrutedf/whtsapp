@@ -604,6 +604,21 @@ export class GeminiService {
         `   (الصيغة الصحيحة: "تفضل رابط مجموعتك على تيليجرام اللي فيها جميع الدروس والمواد: ${telegramUrl} — نوّر معنا ويارب يكون بالخير والبركة! 🌟"\n`
       : '';
 
+    // 🎁 Active Giveaway Context (injected so AI knows current gift number)
+    let giveawayContext = '';
+    const activeGiveaways = (settings.giveaways || []).filter((g: any) => g.isActive);
+    if (activeGiveaways.length > 0) {
+      giveawayContext = `\n\n--- 🎁 مسابقات الهدايا النشطة (Giveaway Intelligence) ---\n`;
+      giveawayContext += `أنت على علم بالمسابقات الأسبوعية التالية ويمكنك الإشارة إليها بطبيعية:\n`;
+      activeGiveaways.forEach((g: any) => {
+        giveawayContext += `• [${g.name}]${g.weekLabel ? ` — ${g.weekLabel}` : ''}:\n`;
+        giveawayContext += `  - الهدية الحالية: رقم ${g.currentGift} من أصل ${g.totalGifts} هدية\n`;
+        giveawayContext += `  - متبقي: ${g.totalGifts - g.currentGift} هدية\n`;
+        if (g.description) giveawayContext += `  - وصف: ${g.description}\n`;
+      });
+      giveawayContext += `توجيه: إذا سأل عميل عن المسابقة أو الهدايا، أخبره برقم الهدية الحالية بثقة.\n`;
+    }
+
     const systemPrompt =
       basePrompt +
       humanStyleRules +
@@ -615,6 +630,7 @@ export class GeminiService {
       memoryContext +
       knowledgeContext +
       catalogContext +
+      giveawayContext +
       skillsContext +
       visionContext;
 

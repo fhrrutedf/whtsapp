@@ -369,6 +369,62 @@ app.get('/api/leads', async (req: Request, res: Response) => {
   }
 });
 
+// ==============================================================================
+// GIVEAWAY / COMPETITION MANAGEMENT API
+// ==============================================================================
+
+// GET all giveaways for tenant
+app.get('/api/giveaways', (req: Request, res: Response) => {
+  const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+  const settings = localStore.getSettings(tenantId);
+  res.json(settings.giveaways || []);
+});
+
+// POST create a new giveaway
+app.post('/api/giveaways', (req: Request, res: Response) => {
+  const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+  const settings = localStore.getSettings(tenantId);
+  const giveaways = settings.giveaways || [];
+  const newItem = {
+    id: `giveaway_${Date.now()}`,
+    tenantId,
+    name: req.body.name || 'مسابقة جديدة',
+    description: req.body.description || '',
+    weekLabel: req.body.weekLabel || '',
+    totalGifts: Number(req.body.totalGifts) || 16,
+    currentGift: Number(req.body.currentGift) || 1,
+    isActive: req.body.isActive !== false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  giveaways.push(newItem);
+  localStore.updateSettings(tenantId, { giveaways });
+  res.status(201).json(newItem);
+});
+
+// PUT update a giveaway
+app.put('/api/giveaways/:id', (req: Request, res: Response) => {
+  const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+  const { id } = req.params;
+  const settings = localStore.getSettings(tenantId);
+  const giveaways: any[] = settings.giveaways || [];
+  const idx = giveaways.findIndex((g: any) => g.id === id);
+  if (idx === -1) { res.status(404).json({ error: 'Not found' }); return; }
+  giveaways[idx] = { ...giveaways[idx], ...req.body, id, updatedAt: new Date().toISOString() };
+  localStore.updateSettings(tenantId, { giveaways });
+  res.json(giveaways[idx]);
+});
+
+// DELETE a giveaway
+app.delete('/api/giveaways/:id', (req: Request, res: Response) => {
+  const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';
+  const { id } = req.params;
+  const settings = localStore.getSettings(tenantId);
+  const giveaways: any[] = (settings.giveaways || []).filter((g: any) => g.id !== id);
+  localStore.updateSettings(tenantId, { giveaways });
+  res.json({ success: true });
+});
+
 // REST: Get Settings (Gemini config & AI agent settings)
 app.get('/api/settings', async (req: Request, res: Response) => {
   const tenantId = (req.headers['x-tenant-id'] as string) || 'demo-tenant-1';

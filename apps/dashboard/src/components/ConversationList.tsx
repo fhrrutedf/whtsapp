@@ -21,16 +21,51 @@ export function ConversationList() {
     activeConversationId, 
     setActiveConversationId,
     isWhatsAppConnected,
-    setWhatsAppModalOpen 
+    setWhatsAppModalOpen,
+    tenantId
   } = useChatStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'unread' | 'escalated' | 'ai'>('all');
   const [mounted, setMounted] = useState(false);
+  const [globalAutoReply, setGlobalAutoReply] = useState<boolean>(true);
+  const [autoReplyLoading, setAutoReplyLoading] = useState<boolean>(false);
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    fetch(`${apiUrl}/api/settings`, {
+      headers: { 'x-tenant-id': tenantId || 'demo-tenant-1' }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (typeof data.geminiAutoReplyEnabled === 'boolean') {
+          setGlobalAutoReply(data.geminiAutoReplyEnabled);
+        }
+      })
+      .catch(() => {});
+  }, [tenantId, apiUrl]);
+
+  const toggleGlobalAutoReply = async () => {
+    const nextState = !globalAutoReply;
+    setAutoReplyLoading(true);
+    setGlobalAutoReply(nextState);
+    try {
+      await fetch(`${apiUrl}/api/settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId || 'demo-tenant-1',
+        },
+        body: JSON.stringify({ geminiAutoReplyEnabled: nextState }),
+      });
+    } catch {
+      setGlobalAutoReply(!nextState);
+    } finally {
+      setAutoReplyLoading(false);
+    }
+  };
 
   const conversationList = mounted ? conversations : [];
 
@@ -88,6 +123,38 @@ export function ConversationList() {
           >
             <QrCode className="w-3.5 h-3.5" />
             <span>{mounted && isWhatsAppConnected ? 'واتساب متصل' : 'ربط واتساب'}</span>
+          </button>
+        </div>
+
+        {/* Global Auto-Reply Toggle Bar */}
+        <div className={`flex items-center justify-between px-3 py-2 rounded-xl border transition-all duration-200 ${
+          globalAutoReply
+            ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+            : 'bg-rose-500/10 border-rose-500/25 text-rose-300'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${globalAutoReply ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold leading-tight">
+                {globalAutoReply ? 'الرد التلقائي الذكي: مفعّل 🤖' : 'الرد التلقائي: متوقف ⏸️'}
+              </span>
+              <span className="text-[9px] text-slate-400">
+                {globalAutoReply ? 'الذكاء الاصطناعي يجيب على الرسائل' : 'لا يتم الرد آلياً (يدوي فقط)'}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={autoReplyLoading}
+            onClick={toggleGlobalAutoReply}
+            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all ${
+              globalAutoReply
+                ? 'bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border-rose-500/30'
+                : 'bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border-emerald-500/30'
+            } disabled:opacity-50`}
+            title={globalAutoReply ? 'اضغط لإيقاف الرد التلقائي لجميع المحادثات' : 'اضغط لتشغيل الرد التلقائي'}
+          >
+            {autoReplyLoading ? '...' : globalAutoReply ? 'إيقاف' : 'تشغيل'}
           </button>
         </div>
 

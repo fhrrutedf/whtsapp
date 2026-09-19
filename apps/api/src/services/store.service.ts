@@ -103,6 +103,21 @@ export interface StoredSettings {
   courseAccessTelegramUrl?: string;
   followUpEnabled?: boolean;
   followUpDelayHours?: number;
+  // 13. Giveaways & Competitions (الهدايا والمسابقات)
+  giveaways?: GiveawayItem[];
+}
+
+export interface GiveawayItem {
+  id: string;
+  tenantId: string;
+  name: string;
+  description?: string;
+  weekLabel?: string;
+  totalGifts: number;
+  currentGift: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ProductCatalogItem {

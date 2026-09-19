@@ -1,8 +1,26 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 
-const INTEREST_CONFIG = {
+interface Lead {
+  id: string;
+  name?: string;
+  whatsappPushName?: string;
+  phoneNumber?: string;
+  countryCode?: string;
+  countryName?: string;
+  interestLevel?: 'HOT' | 'WARM' | 'COLD' | 'PAID' | 'UNINTERESTED' | 'UNKNOWN';
+  interestScore?: number;
+  interestNotes?: string;
+  memoryFacts?: string[];
+  lastSeenAt?: string;
+  firstContactAt?: string;
+  paidAt?: string;
+  isOptedOut?: boolean;
+  courseDeliveredAt?: string;
+}
+
+const INTEREST_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   HOT:          { label: "مهتم جداً 🔥",   color: "#ef4444", bg: "#fef2f2" },
   WARM:         { label: "مهتم ✨",          color: "#f59e0b", bg: "#fffbeb" },
   COLD:         { label: "بارد ❄️",          color: "#3b82f6", bg: "#eff6ff" },
@@ -11,19 +29,19 @@ const INTEREST_CONFIG = {
   UNKNOWN:      { label: "جديد 🆕",          color: "#8b5cf6", bg: "#f5f3ff" },
 };
 
-const COUNTRY_FLAGS = {
+const COUNTRY_FLAGS: Record<string, string> = {
   SY:"🇸🇾",SA:"🇸🇦",AE:"🇦🇪",JO:"🇯🇴",LB:"🇱🇧",IQ:"🇮🇶",KW:"🇰🇼",QA:"🇶🇦",
   BH:"🇧🇭",OM:"🇴🇲",YE:"🇾🇪",EG:"🇪🇬",MA:"🇲🇦",TN:"🇹🇳",DZ:"🇩🇿",SD:"🇸🇩",
   LY:"🇱🇾",PS:"🇵🇸",US:"🇺🇸",GB:"🇬🇧",DE:"🇩🇪",FR:"🇫🇷",SE:"🇸🇪",NL:"🇳🇱",
   NO:"🇳🇴",DK:"🇩🇰",TR:"🇹🇷",RU:"🇷🇺",
 };
 
-function formatDate(iso) {
+function formatDate(iso?: string) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("ar-SY", { year:"numeric", month:"short", day:"numeric" });
 }
 
-function ScoreBadge({ score }) {
+function ScoreBadge({ score }: { score?: number }) {
   const s = score ?? 0;
   const color = s >= 70 ? "#ef4444" : s >= 40 ? "#f59e0b" : "#6b7280";
   return (
@@ -37,11 +55,11 @@ function ScoreBadge({ score }) {
 }
 
 export default function LeadsPage() {
-  const [leads, setLeads] = useState([]);
-  const [filtered, setFiltered] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterLevel, setFilterLevel] = useState("ALL");
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [filtered, setFiltered] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [search, setSearch] = useState<string>("");
+  const [filterLevel, setFilterLevel] = useState<string>("ALL");
   const [stats, setStats] = useState({ total:0, hot:0, paid:0, warm:0 });
 
   const fetchLeads = useCallback(async () => {
@@ -49,7 +67,7 @@ export default function LeadsPage() {
     try {
       const res = await fetch("/api/leads");
       if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
+      const data: Lead[] = await res.json();
       setLeads(data);
       setStats({
         total: data.length,
@@ -78,7 +96,7 @@ export default function LeadsPage() {
     setFiltered(result);
   }, [leads, search, filterLevel]);
 
-  const displayName = (lead) =>
+  const displayName = (lead: Lead) =>
     lead.name && lead.name !== lead.phoneNumber ? lead.name
     : lead.whatsappPushName || lead.phoneNumber || "—";
 
@@ -166,7 +184,7 @@ export default function LeadsPage() {
                       <td style={{ padding:"14px 16px" }}><ScoreBadge score={lead.interestScore} /></td>
                       <td style={{ padding:"14px 16px", maxWidth:200 }}>
                         <div style={{ fontSize:12, color:"#64748b", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{lead.interestNotes||"—"}</div>
-                        {lead.memoryFacts?.length>0 && <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>🧠 {lead.memoryFacts.length} ذكريات</div>}
+                        {lead.memoryFacts && lead.memoryFacts.length > 0 && <div style={{ fontSize:11, color:"#94a3b8", marginTop:2 }}>🧠 {lead.memoryFacts.length} ذكريات</div>}
                       </td>
                       <td style={{ padding:"14px 16px", whiteSpace:"nowrap" }}>
                         <div style={{ fontSize:13, color:"#475569" }}>{formatDate(lead.lastSeenAt||lead.firstContactAt)}</div>

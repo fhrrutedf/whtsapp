@@ -25,7 +25,8 @@ import {
   LogIn,
   UserPlus,
   ChevronUp,
-  TrendingUp
+  TrendingUp,
+  Gift
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -88,6 +89,12 @@ export default function DashboardPage() {
       subLabel: 'Lead Intelligence',
       icon: TrendingUp,
     },
+    {
+      id: 'giveaways',
+      label: 'الهدايا والمسابقات',
+      subLabel: 'Giveaway Manager',
+      icon: Gift,
+    },
   ];
 
   return (
@@ -144,6 +151,23 @@ export default function DashboardPage() {
                     key={item.id}
                     href="/leads"
                     className="group relative w-full h-12 rounded-2xl flex items-center justify-center transition-all duration-200 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 border border-transparent"
+                    title={`${item.label} (${item.subLabel})`}
+                  >
+                    <Icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                    <div className="absolute left-full mr-3 px-3 py-1.5 rounded-xl bg-slate-900/95 text-slate-100 text-xs font-semibold whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 border border-white/10 shadow-2xl backdrop-blur-md">
+                      <span>{item.label}</span>
+                      <span className="block text-[10px] text-slate-400 font-normal">{item.subLabel}</span>
+                    </div>
+                  </Link>
+                );
+              }
+
+              if (item.id === 'giveaways') {
+                return (
+                  <Link
+                    key={item.id}
+                    href="/giveaways"
+                    className="group relative w-full h-12 rounded-2xl flex items-center justify-center transition-all duration-200 text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 border border-transparent"
                     title={`${item.label} (${item.subLabel})`}
                   >
                     <Icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
