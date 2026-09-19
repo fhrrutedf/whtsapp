@@ -1,0 +1,648 @@
+// ==============================================================================
+// Prisma Schema: Multi-Tenant Omnichannel Helpdesk Platform (Zendesk / Chatwoot Architecture)
+// Database: PostgreSQL with Supabase (Extensions: pgvector for AI Semantic Search)
+// Multi-Tenancy: Strict tenant_id isolation enforced across all domain models.
+// Media Strategy: Meta Passthrough (media_id) / Local Storage (media_url) - No AWS S3.
+// ==============================================================================
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+// ------------------------------------------------------------------------------
+// ENUMS
+// ------------------------------------------------------------------------------
+
+enum UserRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  AGENT
+}
+
+enum ChannelType {
+  WHATSAPP
+  MESSENGER
+  WEB_WIDGET
+  EMAIL
+  SMS
+  TELEGRAM
+}
+
+enum SenderType {
+  CONTACT
+  AGENT
+  BOT
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum ConversationStatus {
+  OPEN
+  RESOLVED
+}
+
+enum ResolutionType {
+  PENDING
+  AI_RESOLVED
+  HUMAN_RESOLVED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum TokenTransactionType {
+  USAGE
+  RECHARGE
+  REFUND
+  BONUS
+}
+
+enum KnowledgeSourceType {
+  URL
+  SITEMAP
+  FILE
+  AGENT_CORRECTION
+}
+
+enum SyncFrequency {
+  NEVER
+  DAILY
+  WEEKLY
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum CampaignRecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED_OPTED_OUT
+}
+
+// ------------------------------------------------------------------------------
+// 1. SAAS CORE & ROLES
+// ------------------------------------------------------------------------------
+
+model Tenant {
+  id              String   @id @default(uuid())
+  name            String
+  brandingLogo    String?  @map("branding_logo")
+  primaryColor    String?  @default("#10B981") @map("primary_color")
+  widgetGreeting  String?  @map("widget_greeting")
+  timezone        String?  @default("Asia/Riyadh")
+  currency        String?  @default("SAR")
+  supportEmail    String?  @map("support_email")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relationships
+  users                User[]
+  teams                Team[]
+  contacts             Contact[]
+  conversations        Conversation[]
+  messages             Message[]
+  messageEmbeddings    MessageEmbedding[]
+  subscriptions        TenantSubscription[]
+  tokenTransactions    TokenTransaction[]
+  channelConfigs       ChannelConfig[]
+  tags                 Tag[]
+  conversationTags     ConversationTag[]
+  templates            Template[]
+  cannedResponses      CannedResponse[]
+  aiAgentConfigs       AIAgentConfig[]
+  aiTokenLogs          AITokenLog[]
+  knowledgeItems       KnowledgeItem[]
+  knowledgeBaseSources KnowledgeBaseSource[]
+  knowledgeChunks      KnowledgeChunk[]
+  campaigns            Campaign[]
+  businessHours        BusinessHours[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  email        String    @unique
+  name         String?
+  passwordHash String?   @map("password_hash")
+  role         UserRole  @default(AGENT)
+  teamId       String?   @map("team_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant                Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  team                  Team?          @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  assignedConversations Conversation[]
+
+  @@index([tenantId])
+  @@index([teamId])
+  @@map("users")
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members       User[]
+  conversations Conversation[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("teams")
+}
+
+// ------------------------------------------------------------------------------
+// 2. OMNICHANNEL CHAT ENGINE
+// ------------------------------------------------------------------------------
+
+model Contact {
+  id                 String              @id @default(uuid())
+  tenantId           String              @map("tenant_id")
+  phoneNumber        String?             @map("phone_number")
+  name               String?
+  email              String?
+  avatarUrl          String?             @map("avatar_url")
+  notes              String?             @db.Text
+  memoryFacts        String[]            @default([]) @map("memory_facts")
+  isOptedOut         Boolean             @default(false) @map("is_opted_out")
+  customAttributes   Json?               @default("{}") @map("custom_attributes")
+  lastSeenAt         DateTime?           @map("last_seen_at")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations      Conversation[]
+  campaignRecipients CampaignRecipient[]
+
+  @@unique([tenantId, phoneNumber])
+  @@index([tenantId])
+  @@index([phoneNumber])
+  @@map("contacts")
+}
+
+model Conversation {
+  id                    String             @id @default(uuid())
+  tenantId              String             @map("tenant_id")
+  contactId             String             @map("contact_id")
+  assignedUserId        String?            @map("assigned_user_id")
+  assignedTeamId        String?            @map("assigned_team_id")
+  channelConfigId       String?            @map("channel_config_id")
+  channel               ChannelType        @default(WHATSAPP)
+  status                ConversationStatus @default(OPEN)
+  resolvedAt            DateTime?          @map("resolved_at")
+  firstResponseAt       DateTime?          @map("first_response_at")
+  resolutionType        ResolutionType?    @default(PENDING) @map("resolution_type")
+  slaBreachAt           DateTime?          @map("sla_breach_at")
+  
+  // Critical for Meta 24-Hour Messaging Window Enforcement
+  lastActivityAt        DateTime           @default(now()) @map("last_activity_at")
+  lastCustomerMessageAt DateTime?          @map("last_customer_message_at")
+  windowExpiresAt       DateTime?          @map("window_expires_at")
+  
+  lastMessageSnippet    String?            @map("last_message_snippet")
+  unreadCount           Int                @default(0) @map("unread_count")
+  isAiPaused            Boolean?           @default(false) @map("is_ai_paused")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact       Contact           @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  assignedUser  User?             @relation(fields: [assignedUserId], references: [id], onDelete: SetNull)
+  assignedTeam  Team?             @relation(fields: [assignedTeamId], references: [id], onDelete: SetNull)
+  channelConfig ChannelConfig?    @relation(fields: [channelConfigId], references: [id], onDelete: SetNull)
+  messages      Message[]
+  tags          ConversationTag[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, lastActivityAt])
+  @@index([contactId])
+  @@index([windowExpiresAt])
+  @@index([slaBreachAt])
+  @@map("conversations")
+}
+
+model Message {
+  id                String        @id @default(uuid())
+  tenantId          String        @map("tenant_id")
+  conversationId    String        @map("conversation_id")
+  senderType        SenderType    @map("sender_type")
+  content           String?
+  
+  // Media Strategy: Meta Passthrough (media_id) / Local Storage (media_url) - No AWS S3
+  mediaId           String?       @map("media_id")
+  mediaUrl          String?       @map("media_url")
+  
+  providerMessageId String?       @unique @map("provider_message_id")
+  deliveryStatus    MessageStatus @default(PENDING) @map("delivery_status")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation      Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  embedding         MessageEmbedding?
+
+  @@index([tenantId])
+  @@index([conversationId, createdAt])
+  @@index([providerMessageId])
+  @@map("messages")
+}
+
+model MessageEmbedding {
+  id        String                         @id @default(uuid())
+  tenantId  String                         @map("tenant_id")
+  messageId String                         @unique @map("message_id")
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime                       @default(now()) @map("created_at")
+
+  // Relations
+  tenant    Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  message   Message                        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("message_embeddings")
+}
+
+// ------------------------------------------------------------------------------
+// 3. BUSINESS & SAAS MANAGEMENT
+// ------------------------------------------------------------------------------
+
+model SubscriptionPlan {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  maxAgents   Int      @map("max_agents")
+  maxMessages Int      @map("max_messages")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  subscriptions TenantSubscription[]
+
+  @@map("subscription_plans")
+}
+
+model TenantSubscription {
+  id                   String             @id @default(uuid())
+  tenantId             String             @map("tenant_id")
+  planId               String             @map("plan_id")
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId     String?            @map("stripe_customer_id")
+  stripeSubscriptionId String?            @map("stripe_subscription_id")
+  tokenBalance         Int                @default(0) @map("token_balance")
+  expiresAt            DateTime?          @map("expires_at")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan                 SubscriptionPlan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId])
+  @@index([status, expiresAt])
+  @@map("tenant_subscriptions")
+}
+
+model TokenTransaction {
+  id           String               @id @default(uuid())
+  tenantId     String               @map("tenant_id")
+  amount       Int                  // positive for deductions, negative for refills
+  balanceAfter Int                  @map("balance_after")
+  type         TokenTransactionType @default(USAGE)
+  description  String?
+  metadata     Json?                @default("{}")
+  createdAt    DateTime             @default(now()) @map("created_at")
+
+  // Relations
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("token_transactions")
+}
+
+model ChannelConfig {
+  id              String      @id @default(uuid())
+  tenantId        String      @map("tenant_id")
+  providerName    String      @map("provider_name")
+  channel         ChannelType @default(WHATSAPP)
+  apiKeyEncrypted String?     @map("api_key_encrypted")
+  encryptedKey    String?     @map("encrypted_key")
+  webhookSecret   String?     @map("webhook_secret")
+  proxyUrl        String?     @map("proxy_url")
+  allowedDomains  String[]    @default([]) @map("allowed_domains")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations Conversation[]
+
+  @@unique([tenantId, providerName])
+  @@index([tenantId])
+  @@map("channel_configs")
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  color     String   @default("#6366F1")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversations ConversationTag[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("tags")
+}
+
+model ConversationTag {
+  id             String       @id @default(uuid())
+  tenantId       String       @map("tenant_id")
+  conversationId String       @map("conversation_id")
+  tagId          String       @map("tag_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tag            Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, tagId])
+  @@index([tenantId])
+  @@index([tagId])
+  @@map("conversation_tags")
+}
+
+model Template {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  category  String   @default("UTILITY") // MARKETING, UTILITY, AUTHENTICATION
+  language  String   @default("en")
+  bodyText  String   @map("body_text")
+  status    String   @default("APPROVED") // APPROVED, PENDING, REJECTED
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name, language])
+  @@index([tenantId])
+  @@map("templates")
+}
+
+model CannedResponse {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  shortcut  String
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, shortcut])
+  @@index([tenantId])
+  @@map("canned_responses")
+}
+
+// ------------------------------------------------------------------------------
+// 4. AI INTEGRATION (STATELESS + MEMORY)
+// ------------------------------------------------------------------------------
+
+model AIAgentConfig {
+  id                      String   @id @default(uuid())
+  tenantId                String   @map("tenant_id")
+  provider                String   @default("GEMINI") // GEMINI, OPENROUTER, OPENAI
+  modelName               String?  @default("gemini-2.5-flash") @map("model_name")
+  systemPrompt            String   @map("system_prompt") @db.Text
+  isActive                Boolean  @default(true) @map("is_active")
+  encryptedKey            String?  @map("encrypted_key")
+
+  // Dialect & Tone
+  dialect                 String   @default("syrian")
+  tone                    String   @default("friendly")
+  customDialectPrompt     String?  @map("custom_dialect_prompt") @db.Text
+
+  // Anti-Ban & Humanlike Delays
+  autoReplyDelaySeconds   Int      @default(30) @map("auto_reply_delay_seconds")
+  interMessageDelaySeconds Int     @default(15) @map("inter_message_delay_seconds")
+  sendReadReceipts        Boolean  @default(false) @map("send_read_receipts")
+  excludedPhoneNumbers    String[] @default([]) @map("excluded_phone_numbers")
+
+  // Human Handoff & Escalation (قواعد التصعيد والتسليم لبشري)
+  escalationEnabled       Boolean  @default(true) @map("escalation_enabled")
+  escalationRules         String?  @map("escalation_rules") @db.Text
+  escalationPreActions    String?  @map("escalation_pre_actions") @db.Text
+  handoffKeywords         String[] @default(["موظف", "بشري", "شكوى", "مدير", "اتصال", "تحويل", "إلغاء", "دفع"]) @map("handoff_keywords")
+  handoffTeamRouting      Json?    @default("[]") @map("handoff_team_routing")
+  handoffMaxTurns         Int      @default(5) @map("handoff_max_turns")
+  handoffStopNotification String?  @map("handoff_stop_notification") @db.Text
+  outOfOfficeMessage      String?  @map("out_of_office_message") @db.Text
+
+  // Safety Guardrails & Error Recovery (حواجز الأمان واستعادة الأخطاء)
+  safetyGuardrails        String?  @map("safety_guardrails") @db.Text
+  errorRecovery           String?  @map("error_recovery") @db.Text
+
+  // Durable Memory Across Sessions (ذاكرة العميل الدائمة)
+  userMemoryEnabled       Boolean  @default(true) @map("user_memory_enabled")
+  userMemoryPrompt        String?  @map("user_memory_prompt") @db.Text
+
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+  @@map("ai_agent_configs")
+}
+
+model AITokenLog {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  promptTokens     Int      @map("prompt_tokens")
+  completionTokens Int      @map("completion_tokens")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("ai_token_logs")
+}
+
+model KnowledgeItem {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  title      String
+  type       String   @default("text") // text, url, file
+  content    String   @db.Text
+  source     String?  @db.Text
+  charCount  Int      @default(0) @map("char_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("knowledge_items")
+}
+
+// ------------------------------------------------------------------------------
+// 5. ENTERPRISE KNOWLEDGE BASE (RAG) INGESTION & VECTOR SOURCES
+// ------------------------------------------------------------------------------
+
+model KnowledgeBaseSource {
+  id            String              @id @default(uuid())
+  tenantId      String              @map("tenant_id")
+  title         String
+  type          KnowledgeSourceType
+  url           String?
+  fileUrl       String?             @map("file_url")
+  mimeType      String?             @map("mime_type")
+  contentHash   String?             @map("content_hash")
+  syncFrequency SyncFrequency       @default(NEVER) @map("sync_frequency")
+  lastSyncedAt  DateTime?           @map("last_synced_at")
+  crawlDepth    Int                 @default(1) @map("crawl_depth")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  chunks        KnowledgeChunk[]
+
+  @@index([tenantId])
+  @@index([syncFrequency])
+  @@map("knowledge_base_sources")
+}
+
+model KnowledgeChunk {
+  id         String              @id @default(uuid())
+  tenantId   String              @map("tenant_id")
+  sourceId   String              @map("source_id")
+  content    String              @db.Text
+  metadata   Json?               @default("{}")
+  embedding  Unsupported("vector(1536)")?
+  weight     Float               @default(1.0)
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  // Relations
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  source     KnowledgeBaseSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([sourceId])
+  @@map("knowledge_chunks")
+}
+
+// ------------------------------------------------------------------------------
+// 6. WHATSAPP DRIP CAMPAIGNS & BROADCASTS
+// ------------------------------------------------------------------------------
+
+model Campaign {
+  id           String              @id @default(uuid())
+  tenantId     String              @map("tenant_id")
+  name         String
+  messageText  String              @map("message_text") @db.Text
+  status       CampaignStatus      @default(DRAFT)
+  scheduledAt  DateTime?           @map("scheduled_at")
+  totalCount   Int                 @default(0) @map("total_count")
+  sentCount    Int                 @default(0) @map("sent_count")
+  failedCount  Int                 @default(0) @map("failed_count")
+  completedAt  DateTime?           @map("completed_at")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  recipients   CampaignRecipient[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("campaigns")
+}
+
+model CampaignRecipient {
+  id           String                  @id @default(uuid())
+  campaignId   String                  @map("campaign_id")
+  contactId    String?                 @map("contact_id")
+  phoneNumber  String                  @map("phone_number")
+  status       CampaignRecipientStatus @default(PENDING)
+  sentAt       DateTime?               @map("sent_at")
+  error        String?
+  createdAt    DateTime                @default(now()) @map("created_at")
+
+  // Relations
+  campaign     Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact      Contact?                @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  @@index([campaignId])
+  @@index([status])
+  @@map("campaign_recipients")
+}
+
+// ------------------------------------------------------------------------------
+// 7. BUSINESS HOURS ROUTING
+// ------------------------------------------------------------------------------
+
+model BusinessHours {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  dayOfWeek Int      @map("day_of_week") // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+  openTime  String   @map("open_time")   // "09:00"
+  closeTime String   @map("close_time")  // "18:00"
+  isClosed  Boolean  @default(false) @map("is_closed")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, dayOfWeek])
+  @@index([tenantId])
+  @@map("business_hours")
+}

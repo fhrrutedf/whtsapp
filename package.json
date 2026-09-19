@@ -1,0 +1,24 @@
+{
+  "name": "omnichannel-platform",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@10.9.8",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "db:generate": "npm run db:generate --workspace=@omni/database",
+    "db:push": "npm run db:push --workspace=@omni/database",
+    "db:migrate": "npm run db:migrate --workspace=@omni/database",
+    "db:migrate:deploy": "npm run db:migrate:deploy --workspace=@omni/database",
+    "db:studio": "npm run db:studio --workspace=@omni/database"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.3"
+  }
+}

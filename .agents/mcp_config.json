@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "omnidesk-helpdesk": {
+      "command": "npx",
+      "args": ["tsx", "c:/whtasapp/apps/api/src/mcp/server.ts"],
+      "env": {
+        "DATABASE_URL": "postgresql://postgres:postgres@localhost:5432/omni_db"
+      }
+    }
+  }
+}

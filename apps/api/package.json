@@ -1,0 +1,42 @@
+{
+  "name": "@omni/api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/server.ts",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "mcp": "tsx src/mcp/server.ts"
+  },
+  "dependencies": {
+    "@omni/database": "*",
+    "@omni/types": "*",
+    "@types/qrcode": "^1.5.6",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "axios": "^1.7.9",
+    "bullmq": "^5.41.4",
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.5",
+    "csv-parser": "^3.2.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "https-proxy-agent": "^9.1.0",
+    "ioredis": "^5.5.0",
+    "multer": "^2.4.0",
+    "pdf-parse": "^2.4.5",
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4",
+    "sitemap": "^9.0.1",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^22.13.4",
+    "@types/pdf-parse": "^1.1.5",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
