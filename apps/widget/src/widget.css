@@ -1,5 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600;700&display=swap');
 
+:root {
+  --omni-primary: #10b981;
+  --omni-primary-dark: #059669;
+  --omni-primary-glow: rgba(16, 185, 129, 0.4);
+}
+
 .omni-widget-container {
   position: fixed;
   bottom: 24px;
@@ -7,6 +13,12 @@
   z-index: 999999;
   font-family: 'Readex Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   letter-spacing: -0.01em;
+  direction: rtl;
+}
+
+.omni-widget-container.position-left {
+  right: auto;
+  left: 24px;
 }
 
 .omni-widget-container * {
@@ -14,11 +26,11 @@
 }
 
 .omni-launcher-btn {
-  width: 58px;
-  height: 58px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.45);
+  background: var(--omni-primary, #10b981);
+  box-shadow: 0 10px 25px -5px var(--omni-primary-glow, rgba(16, 185, 129, 0.45));
   border: none;
   cursor: pointer;
   display: flex;
@@ -29,30 +41,35 @@
 }
 
 .omni-launcher-btn:hover {
-  transform: scale(1.06);
-  box-shadow: 0 12px 30px -5px rgba(16, 185, 129, 0.65);
+  transform: scale(1.08);
+  box-shadow: 0 14px 30px -5px var(--omni-primary-glow, rgba(16, 185, 129, 0.65));
 }
 
 .omni-launcher-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
 }
 
 .omni-chat-window {
   position: absolute;
-  bottom: 74px;
+  bottom: 76px;
   right: 0;
   width: 380px;
-  height: 540px;
+  height: 560px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 100px);
   background: #090d16;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 24px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   animation: omniFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.position-left .omni-chat-window {
+  right: auto;
+  left: 0;
 }
 
 @keyframes omniFadeIn {
@@ -62,14 +79,14 @@
 
 .omni-header {
   padding: 16px 20px;
-  background: rgba(15, 23, 42, 0.9);
+  background: rgba(15, 23, 42, 0.95);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: #f8fafc;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .omni-header-title {
@@ -88,16 +105,16 @@
 }
 
 .omni-status-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background: var(--omni-primary, #10b981);
+  box-shadow: 0 0 8px var(--omni-primary, #10b981);
 }
 
 .omni-close-btn {
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: #94a3b8;
   cursor: pointer;
   width: 32px;
@@ -106,12 +123,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 15px;
   transition: all 0.2s ease;
 }
 
 .omni-close-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   color: #f8fafc;
 }
 
@@ -121,7 +138,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   background: #090d16;
 }
 
@@ -130,39 +147,74 @@
 }
 
 .omni-messages-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 999px;
 }
 
 .omni-bubble {
-  max-width: 82%;
+  max-width: 85%;
   padding: 10px 14px;
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
   border-radius: 16px;
   word-break: break-word;
+  white-space: pre-wrap;
+  animation: omniMsgSlide 0.2s ease-out;
+}
+
+@keyframes omniMsgSlide {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .omni-bubble.visitor {
   align-self: flex-start;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: var(--omni-primary, #10b981);
   color: #ffffff;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 4px 12px -2px rgba(16, 185, 129, 0.3);
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px -2px var(--omni-primary-glow, rgba(16, 185, 129, 0.3));
 }
 
 .omni-bubble.agent {
   align-self: flex-end;
-  background: rgba(30, 41, 59, 0.7);
-  color: #f1f5f9;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom-right-radius: 4px;
+  background: rgba(30, 41, 59, 0.85);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-bottom-left-radius: 4px;
+}
+
+.omni-bubble.agent.typing {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 16px;
+  background: rgba(30, 41, 59, 0.6);
+}
+
+.omni-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  animation: omniBounce 1.2s infinite ease-in-out;
+}
+
+.omni-typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.omni-typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes omniBounce {
+  0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
 }
 
 .omni-composer {
   padding: 12px 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(15, 23, 42, 0.85);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
@@ -173,19 +225,20 @@
 .omni-input {
   flex: 1;
   background: #060911;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #f8fafc;
   border-radius: 12px;
-  padding: 9px 14px;
-  font-size: 12.5px;
+  padding: 10px 14px;
+  font-size: 13px;
   font-family: inherit;
   outline: none;
   transition: all 0.2s ease;
+  direction: rtl;
 }
 
 .omni-input:focus {
-  border-color: rgba(16, 185, 129, 0.5);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+  border-color: var(--omni-primary, #10b981);
+  box-shadow: 0 0 0 2px var(--omni-primary-glow, rgba(16, 185, 129, 0.2));
 }
 
 .omni-input::placeholder {
@@ -193,24 +246,33 @@
 }
 
 .omni-send-btn {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: var(--omni-primary, #10b981);
   border: none;
-  color: #022c22;
+  color: #ffffff;
   border-radius: 12px;
-  padding: 9px 16px;
-  font-size: 12.5px;
-  font-weight: 800;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 2px 8px var(--omni-primary-glow, rgba(16, 185, 129, 0.25));
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .omni-send-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 4px 14px var(--omni-primary-glow, rgba(16, 185, 129, 0.4));
 }
 
 .omni-send-btn:active {
   transform: translateY(0);
+}
+
+.omni-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }

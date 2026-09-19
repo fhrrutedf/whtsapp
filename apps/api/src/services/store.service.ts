@@ -105,6 +105,13 @@ export interface StoredSettings {
   followUpDelayHours?: number;
   // 13. Giveaways & Competitions (الهدايا والمسابقات)
   giveaways?: GiveawayItem[];
+  // 14. Payment Accounts & Methods (بيانات وطرق الدفع والتحويل)
+  shamCashAccount?: string;
+  shamCashName?: string;
+  syriatelCashAccount?: string;
+  alharamDetails?: string;
+  onlinePaymentUrl?: string;
+  bankAccountDetails?: string;
 }
 
 export interface GiveawayItem {
@@ -389,6 +396,12 @@ class LocalStoreManager {
       checkoutBaseUrl: s.checkoutBaseUrl,
       meetingSchedulerUrl: s.meetingSchedulerUrl,
       defaultDiscountPercentage: s.defaultDiscountPercentage || 10,
+      shamCashAccount: s.shamCashAccount || '',
+      shamCashName: s.shamCashName || '',
+      syriatelCashAccount: s.syriatelCashAccount || '',
+      alharamDetails: s.alharamDetails || '',
+      onlinePaymentUrl: s.onlinePaymentUrl || '',
+      bankAccountDetails: s.bankAccountDetails || '',
     };
   }
 

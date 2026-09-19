@@ -1,4 +1,15 @@
+import dotenv from 'dotenv';
+import path from 'path';
 import Redis from 'ioredis';
+
+// Ensure environment variables are loaded regardless of import order
+dotenv.config();
+if (!process.env.REDIS_URL) {
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+}
+if (!process.env.REDIS_URL) {
+  dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+}
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const isUpstash = redisUrl.startsWith('rediss://');
@@ -7,11 +18,10 @@ export const redisConnection = new Redis(redisUrl, {
   maxRetriesPerRequest: null,   // Required by BullMQ
   enableReadyCheck: false,      // Required by BullMQ
   connectTimeout: 10000,
-  lazyConnect: true,            // Don't auto-connect on import — connect on demand
   retryStrategy: (times) => {
     // After 3 failed attempts, give up (don't spam logs)
-    if (times > 3) {
-      console.warn('⚠️  Redis unavailable after 3 attempts. BullMQ queues disabled.');
+    if (times > 5) {
+      console.warn('⚠️  Redis unavailable after 5 attempts. BullMQ queues disabled.');
       return null; // Stop retrying
     }
     return Math.min(times * 1000, 3000); // Retry after 1s, 2s, 3s
@@ -37,7 +47,3 @@ redisConnection.on('error', (err) => {
   }
 });
 
-// Attempt connection
-redisConnection.connect().catch(() => {
-  // Silently handled by retryStrategy
-});

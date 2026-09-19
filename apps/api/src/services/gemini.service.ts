@@ -35,6 +35,12 @@ export class GeminiService {
     // Remove any remaining stray asterisks
     cleaned = cleaned.replace(/\*/g, '');
 
+    // 🛡️ CRITICAL: Eradicate bracketed placeholder hallucinations (NEVER output [LINK], [اضف...], etc. to customers!)
+    cleaned = cleaned.replace(/(?:تفضل\s+)?رابط\s+الدفع\s+(?:المباشر\s+)?(?:لتفعيل\s+اشتراكك\s+فوراً:?)?\s*\[\s*(?:LINK|URL|رابط|الرابط)\s*\]/gi, 'لتفعيل اشتراكك فوراً متاح التحويل عبر سيريتل كاش، شام كاش، أو الهرم. أي طريقة أنسب إلك؟');
+    cleaned = cleaned.replace(/\[\s*(?:LINK|URL|رابط|الرابط|YOUR_[A-Z_]+)\s*\]/gi, '');
+    cleaned = cleaned.replace(/(?:رقم الحساب\s*(?:\/|\-)?\s*المعرّف:?\s*)?\[\s*(?:اضف|أضف|ضع|ادخل|أدخل|اكتب)\s+[^\]]+\]/gi, 'سيزودك به الأستاذ نواف مباشرة للتفعيل الفوري');
+    cleaned = cleaned.replace(/\[\s*(?:رقم الحساب|رقم الهاتف|اسم الحساب|المعرف|المعرّف)\s*\]/gi, '');
+
     // Clean multiple consecutive blank lines
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 
@@ -165,42 +171,72 @@ export class GeminiService {
   }
 
   /**
-   * Splits a longer response into natural, human-like WhatsApp bubbles (1 to 3 messages).
+   * Splits a response semantically into natural, complete-thought WhatsApp bubbles (1 to 3 messages).
+   * - Short/moderate texts stay as a single message.
+   * - Long texts are split by complete thoughts (paragraphs or completed sentences with terminal punctuation).
+   * - Message 1 always finishes a complete understandable thought (تنتهي بمفهومة).
    */
-  public static splitIntoNaturalBubbles(text: string): string[] {
+  public static splitIntoNaturalBubbles(text: string, maxBubbles: number = 3): string[] {
     if (!text) return [];
     const clean = this.cleanTextForHumanWhatsApp(text);
 
-    // Split on double newlines (paragraphs)
-    const paragraphs = clean
+    // If text is short or moderate (up to 180 chars, ~2 short lines), keep it in a single bubble
+    if (clean.length <= 180) {
+      return [clean];
+    }
+
+    // 1. First priority: Check double newlines (paragraphs / distinct thoughts)
+    const rawParagraphs = clean
       .split(/\n\s*\n/)
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
 
-    if (paragraphs.length <= 1) {
-      // If single block is long (> 260 chars), split by sentences naturally
-      if (clean.length > 260) {
-        const sentences = clean.match(/[^.!?؟\n]+[.!?؟\n]*/g);
-        if (sentences && sentences.length > 1) {
-          const chunks: string[] = [];
-          let current = '';
-          for (const s of sentences) {
-            if ((current + ' ' + s).trim().length > 180 && current.length > 0) {
-              chunks.push(current.trim());
-              current = s;
-            } else {
-              current = (current + ' ' + s).trim();
-            }
-          }
-          if (current.trim().length > 0) chunks.push(current.trim());
-          if (chunks.length > 1) return chunks.slice(0, 3);
+    if (rawParagraphs.length >= 2) {
+      const bubbles: string[] = [];
+      let current = '';
+
+      for (const p of rawParagraphs) {
+        if (!current) {
+          current = p;
+        } else if (current.length < 85) {
+          // If previous part is too short (e.g. greeting alone), merge with next so it forms a complete thought
+          current += '\n' + p;
+        } else {
+          bubbles.push(current);
+          current = p;
         }
       }
+      if (current) bubbles.push(current);
+      if (bubbles.length > 1) {
+        return bubbles.slice(0, maxBubbles);
+      }
+    }
+
+    // 2. Second priority: If it is a single continuous long block (> 220 chars),
+    // split cleanly by complete sentence endings (. or ! or ؟ or newlines)
+    const sentences = clean.match(/[^.!?؟\n]+[.!?؟\n]*/g) || [clean];
+    if (sentences.length <= 1) {
       return [clean];
     }
 
-    // Limit to max 3 natural bubbles so it doesn't spam the user
-    return paragraphs.slice(0, 3);
+    const bubbles: string[] = [];
+    let current = '';
+
+    for (const s of sentences) {
+      // If current chunk has formed a complete sentence of adequate length (> 130 chars),
+      // seal it as a complete thought (تنتهي الرسالة الأولى بمفهومة)
+      if ((current + ' ' + s).trim().length > 180 && current.length >= 70) {
+        bubbles.push(current.trim());
+        current = s.trim();
+      } else {
+        current = (current ? current + ' ' + s : s).trim();
+      }
+    }
+    if (current) {
+      bubbles.push(current.trim());
+    }
+
+    return bubbles.slice(0, maxBubbles);
   }
 
   /**
@@ -467,8 +503,18 @@ export class GeminiService {
       `2. ممنوع منعاً باتاً وضع علامات النجوم (**) أو (*) في النص إطلاقاً! اكتب الكلمات عادية بدون أي نجوم حتى تبدو طبيعية تماماً.\n` +
       `3. اجعل رسائلك قصيرة ومريحة للقراءة (من 1 إلى 3 جُمل فقط). تجنب المقالات والفقرات الطويلة المملة.\n` +
       `4. لا تضع أي مقدمات آلية مثل (بناءً على طلبك، عزيزي العميل، بصفتي مساعد ذكي..).\n` +
-      `5. إذا احتوت الإجابة على أكثر من فكرة، افصل بينها بسطر فارغ لتظهر كرسائل متتابعة.\n` +
+      `5. تقطيع الرسائل حسب المحتوى: إذا كان الجواب طويلاً أو يحتوي على أكثر من فكرة، افصل بين الأفكار بسطر فارغ مزدوج لتظهر كرسائل متتابعة:\n` +
+      `   - الرسالة الأولى: اجعلها فكرة تامة ومفهومة لوحدها وتنتهي بنقطة أو علامة ترقيم (كالترحيب والجواب الأساسي).\n` +
+      `   - الرسالة الثانية: تبدأ بالتفاصيل الإضافية، الرابط، أو سؤال المتابعة.\n` +
+      `   - تجنب إرسال رسائل مجتزأة أو ناقصة المعنى في الرسالة الأولى.\n` +
       `6. ⚠️ قاعدة الاسم الإلزامية: لا تنادِ العميل باسم إطلاقاً إلا إذا ذكر اسمه بنفسه في المحادثة. اسم الواتساب (Push Name) المعروض على الهاتف ليس اسمه الحقيقي وقد يكون اسم شخص آخر أو لقباً — لا تستخدمه أبداً للتحية.\n` +
+      `7. ⚠️⛔ ممنوع منعاً باتاً كتابة أي نصوص افتراضية أو قوالب أو أقواس نائبة إطلاقاً، مثل: [LINK] أو [رابط] أو [اضف رقم الحساب هنا] أو [ضع...] أو [اسم الحساب] أو [URL]! العميل شخص حقيقي يدردش معك مباشرة، وليس قالباً برمجياً.\n` +
+      `   - إذا كان رقم الحساب أو الرابط المعتمد موجوداً في النظام: اذكره فوراً بدقة.\n` +
+      `   - إذا لم تكن تفاصيل الحساب المباشرة مدخلة بعد: تحدث كإنسان حقيقي ولبق وقل له: "ع عيني واختيار ممتاز! لتثبيت اشتراكك فوراً، اتركلي اسمك الثلاثي ومادتك التدريسية حتى حوّلك للأستاذ نواف ليزودك بالرقم مباشرة ويثبت اشتراكك بثواني."\n` +
+      `8. 💳 طرق الدفع المعتمدة:\n` +
+      `   - داخل سوريا: متاح سيريتل كاش، شام كاش، شبكة الهرم أو الفؤاد، وبنك بيمو.\n` +
+      `   - خارج سوريا: متاح بايبال، ويسترن يونيون، بطاقة بنكية دولية.\n` +
+      `   - لا تدّعِ وجود رابط دفع أونلاين على الموقع إذا لم يكن موجوداً، ولا ترسل روابط وهمية أو تضع [LINK] أبداً.\n` +
       `${dialectInstruction}\n` +
       `${toneInstruction}\n`;
 
@@ -619,9 +665,20 @@ export class GeminiService {
       giveawayContext += `توجيه: إذا سأل عميل عن المسابقة أو الهدايا، أخبره برقم الهدية الحالية بثقة.\n`;
     }
 
+    // 💳 Official Payment Link Context (Zero-Placeholder Guaranteed)
+    let paymentAccountsContext = `\n\n--- 💳 رابط وبوابة الدفع المعتمدة ---\n`;
+    const paymentLink = settings.checkoutBaseUrl && !settings.checkoutBaseUrl.includes('yourdomain.com') ? settings.checkoutBaseUrl : '';
+    if (paymentLink) {
+      paymentAccountsContext += `رابط الدفع المباشر الشامل المعتمد:\n🔗 ${paymentLink}\n` +
+        `توجيه إلزامي: عندما يطلب العميل الدفع أو الاشتراك، زوّده بهذا الرابط فوراً بترحيب ودفء (مثال: "تفضل يا غالي رابط الدفع المباشر لتفعيل اشتراكك فوراً: ${paymentLink}").\n`;
+    } else {
+      paymentAccountsContext += `تنبيه: لا يوجد رابط دفع مسجل في النظام حالياً. إذا طلب العميل الدفع، رحب به بلطف واطلب اسمه الثلاثي ومادته لتجهيز التفعيل المباشر وتحويله للمدرب أ. نواف. ⚠️ ممنوع منعاً باتاً كتابة [LINK] أو أي كلمات نائبة بين أقواس!\n`;
+    }
+
     const systemPrompt =
       basePrompt +
       humanStyleRules +
+      paymentAccountsContext +
       salesIntelligence +
       receiptDeliveryContext +
       safetyContext +
@@ -920,7 +977,21 @@ export class GeminiService {
     }
 
     // 3. Payment inquiry
-    if (raw.includes('دفع') || raw.includes('ادفع') || raw.includes('طريقة الدفع') || raw.includes('اشترك') || raw.includes('سداد') || raw.includes('سيريتل') || raw.includes('شام كاش') || raw.includes('هرم')) {
+    if (raw.includes('شام كاش') || raw.includes('شامكاش')) {
+      if (settings.shamCashAccount) {
+        return `ع عيني، اختيار ممتاز وسريع! 🌸\nهاد حساب شام كاش المعتمد لتحويل مبلغ 22$ (أو ما يعادله بالمحلي):\nاسم الحساب: ${settings.shamCashName || 'نواف البوسطة'}\nرقم الحساب / المعرّف: ${settings.shamCashAccount}\n\nبعد ما تحول، ابعتلنا صورة الإشعار هون بالدردشة وثواني وبتكون معنا على تليجرام لتستلم الكورس وكل الهدايا! 😊✨`;
+      }
+      return `ع عيني، اختيار ممتاز وسريع! 🌸\nلتثبيت اشتراكك فوراً وتحويل 22$ عبر شام كاش، اتركلي اسمك الثلاثي ومادتك ورح حوّلك فوراً للأستاذ نواف ليزودك برقم الحساب مباشرة للتفعيل الفوري. 😊✨`;
+    }
+
+    if (raw.includes('سيريتل كاش') || raw.includes('سيرياتيل')) {
+      if (settings.syriatelCashAccount) {
+        return `تكرم عينك! هاد حساب سيريتل كاش المعتمد لتحويل 22$:\nالرقم / الكود: ${settings.syriatelCashAccount}\nباسم: ${settings.shamCashName || 'نواف البوسطة'}\n\nابعتلنا الإشعار بعد التحويل لتفعيل حسابك مباشرة! ✨`;
+      }
+      return `تكرم عينك يا غالي! للتحويل عبر سيريتل كاش، اتركلي اسمك ومادتك حتى حوّلك فوراً للأستاذ نواف ليزودك بالرقم المعتمد للتفعيل بثواني. ✨`;
+    }
+
+    if (raw.includes('دفع') || raw.includes('ادفع') || raw.includes('طريقة الدفع') || raw.includes('اشترك') || raw.includes('سداد') || raw.includes('هرم') || raw.includes('فؤاد') || raw.includes('بايبال')) {
       const qrMedia = settings.paymentQrImageUrl ? `[MEDIA:${settings.paymentQrImageUrl}] ` : '';
       return `${qrMedia}تكرم عينك! للتحويل داخل سوريا متاح (سيريتل كاش، شام كاش، الهرم، الفؤاد، أو بنك بيمو) بتفعيل فوري ومباشر. وللتحويل من خارج سوريا متاح (بايبال، ويسترن يونيون، أو بطاقة بنكية). أي طريقة أنسب إلك لأرسلك بياناتها فوراً؟`;
     }

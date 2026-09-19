@@ -29,6 +29,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import { BusinessHoursService } from './businessHours.service';
 import { setConversationSla } from './sla.monitor';
 import { updateContactLeadScore } from './leadScoring.service';
+import { toValidUuid } from '../utils/uuid';
 
 // Suppress verbose Baileys pino logs in development
 const logger = P({ level: 'silent' });
@@ -52,6 +53,12 @@ export class WhatsAppManager {
 
   // Map of tenantId -> Daily micro-restart timer (Anti-Ban Stealth)
   private microRestartTimers = new Map<string, NodeJS.Timeout>();
+
+  // Map of active auto-reply debounce timers: conversationId -> NodeJS.Timeout
+  private autoReplyDebounceTimers = new Map<string, NodeJS.Timeout>();
+
+  // Set of conversationIds currently generating replies (locks out duplicate processing)
+  private activeGeneratingConversations = new Set<string>();
 
   /**
    * Startup hook: Fetch all active WHATSAPP ChannelConfigs across tenants and initialize connections.
@@ -101,16 +108,23 @@ export class WhatsAppManager {
     let activeChannelConfigId = channelConfigId;
     if (!activeChannelConfigId) {
       try {
+        const validTenantId = toValidUuid(tenantId);
         const channelConfig = await prisma.channelConfig.findFirst({
-          where: { tenantId, channel: 'WHATSAPP' },
+          where: { tenantId: validTenantId, channel: 'WHATSAPP' },
         });
 
         if (channelConfig) {
           activeChannelConfigId = channelConfig.id;
         } else {
+          await prisma.tenant.upsert({
+            where: { id: validTenantId },
+            update: {},
+            create: { id: validTenantId, name: tenantId },
+          }).catch(() => {});
+
           const createdConfig = await prisma.channelConfig.create({
             data: {
-              tenantId,
+              tenantId: validTenantId,
               channel: 'WHATSAPP',
               providerName: `whatsapp_${tenantId}`,
               apiKeyEncrypted: 'baileys_local_session',
@@ -408,7 +422,7 @@ export class WhatsAppManager {
         try {
           await prisma.contact.updateMany({
             where: {
-              tenantId,
+              tenantId: toValidUuid(tenantId),
               OR: [
                 { phoneNumber: displayPhone },
                 { phoneNumber: cleanPhone },
@@ -601,14 +615,29 @@ export class WhatsAppManager {
                   console.error('[WhatsAppManager] Failed sending max-turns handoff message:', e.message);
                 }
               }, 1000);
-            } else {
-              // 4. Configurable Natural Delay (e.g. 30 to 60 seconds or custom)
-              const delaySeconds = settings.autoReplyDelaySeconds !== undefined ? settings.autoReplyDelaySeconds : 30;
+              // 4. Configurable Natural Delay with Intelligent Debounce
+              const delaySeconds = settings.autoReplyDelaySeconds !== undefined ? settings.autoReplyDelaySeconds : 20;
               const delayMs = Math.max(1000, delaySeconds * 1000);
+
+              // 🛑 DEBOUNCE: If customer sends multiple messages in a row, cancel previous timer and wait for them to finish!
+              const existingTimer = this.autoReplyDebounceTimers.get(convId);
+              if (existingTimer) {
+                clearTimeout(existingTimer);
+                console.log(`[WhatsAppManager:${tenantId}] 🔄 Resetting natural reply delay for ${displayPhone} (new incoming message batched).`);
+              }
 
               console.log(`[WhatsAppManager:${tenantId}] ⏳ Natural delay scheduled: will reply in ${delaySeconds}s to ${displayPhone}...`);
 
-              setTimeout(async () => {
+              const timer = setTimeout(async () => {
+                this.autoReplyDebounceTimers.delete(convId);
+
+                // Concurrency lock: If already generating for this conversation, avoid duplicate execution
+                if (this.activeGeneratingConversations.has(convId)) {
+                  console.log(`[WhatsAppManager:${tenantId}] ⏸️ Reply generation already in progress for ${convId}. Skipping duplicate.`);
+                  return;
+                }
+                this.activeGeneratingConversations.add(convId);
+
                 try {
                   // Re-check before replying: Did a human agent already intervene during the delay?
                   const latestHistory = localStore.getMessages(convId);
@@ -655,8 +684,8 @@ export class WhatsAppManager {
                     // 1. Clean asterisks and robot formatting
                     const cleanedReply = GeminiService.cleanTextForHumanWhatsApp(aiReply);
 
-                    // 2. Split into natural WhatsApp bubbles (1 to 3 messages)
-                    const bubbles = GeminiService.splitIntoNaturalBubbles(cleanedReply);
+                    // 2. Split into natural WhatsApp bubbles (max 2 bubbles to avoid flooding)
+                    const bubbles = GeminiService.splitIntoNaturalBubbles(cleanedReply, 2);
 
                     for (let i = 0; i < bubbles.length; i++) {
                       const bubble = bubbles[i];
@@ -696,8 +725,12 @@ export class WhatsAppManager {
                   }
                 } catch (aiErr: any) {
                   console.error('[WhatsAppManager] Gemini auto-reply error:', aiErr.message);
+                } finally {
+                  this.activeGeneratingConversations.delete(convId);
                 }
               }, delayMs);
+
+              this.autoReplyDebounceTimers.set(convId, timer);
             }
           }
         }
@@ -705,15 +738,24 @@ export class WhatsAppManager {
 
       // Try Database Persistence if DB is active
       try {
+        const dbTenantId = toValidUuid(tenantId);
+
+        // Ensure tenant exists in DB
+        await prisma.tenant.upsert({
+          where: { id: dbTenantId },
+          update: {},
+          create: { id: dbTenantId, name: tenantId },
+        }).catch(() => {});
+
         // 1. Upsert Contact associated with tenantId
         const contact = await prisma.contact.upsert({
-          where: { tenantId_phoneNumber: { tenantId, phoneNumber: displayPhone } },
+          where: { tenantId_phoneNumber: { tenantId: dbTenantId, phoneNumber: displayPhone } },
           update: {
             name: msg.pushName || undefined,
             lastSeenAt: new Date(),
           },
           create: {
-            tenantId,
+            tenantId: dbTenantId,
             phoneNumber: displayPhone,
             name: pushName,
             lastSeenAt: new Date(),
@@ -726,7 +768,7 @@ export class WhatsAppManager {
         const snippet = textContent || '[WhatsApp Message]';
         let conversation = await prisma.conversation.findFirst({
           where: {
-            tenantId,
+            tenantId: dbTenantId,
             contactId: contact.id,
             channel: 'WHATSAPP',
           },
@@ -735,7 +777,7 @@ export class WhatsAppManager {
         if (!conversation) {
           conversation = await prisma.conversation.create({
             data: {
-              tenantId,
+              tenantId: dbTenantId,
               contactId: contact.id,
               channelConfigId: (channelConfigId && channelConfigId.length > 20) ? channelConfigId : null,
               channel: 'WHATSAPP',
@@ -768,7 +810,7 @@ export class WhatsAppManager {
           where: { providerMessageId: msgId },
           update: {},
           create: {
-            tenantId,
+            tenantId: dbTenantId,
             conversationId: conversation.id,
             senderType: isFromMe ? SenderType.AGENT : SenderType.CONTACT,
             content: textContent,
@@ -1047,9 +1089,10 @@ export class WhatsAppManager {
     }
 
     try {
+      const dbTenantId = toValidUuid(tenantId);
       prisma.message.create({
         data: {
-          tenantId,
+          tenantId: dbTenantId,
           conversationId: convId,
           senderType: senderType === 'BOT' ? SenderType.BOT : SenderType.AGENT,
           content: text,
@@ -1183,7 +1226,7 @@ export class WhatsAppManager {
     try {
       const dbContact = await prisma.contact.findFirst({
         where: {
-          tenantId,
+          tenantId: toValidUuid(tenantId),
           OR: [
             { phoneNumber: displayPhone },
             { phoneNumber: cleanPhone },

@@ -21,6 +21,12 @@ import {
   Smartphone,
   CheckCheck,
   Zap,
+  Globe,
+  Code2,
+  Copy,
+  Palette,
+  Eye,
+  Terminal,
 } from 'lucide-react';
 
 export function ChannelsSettings() {
@@ -43,6 +49,14 @@ export function ChannelsSettings() {
 
   // Accordion state for Anti-Ban
   const [antiBanExpanded, setAntiBanExpanded] = useState(false);
+
+  // Web Chat Widget State
+  const [widgetTitle, setWidgetTitle] = useState('مساعد OmniDesk الذكي');
+  const [widgetWelcome, setWidgetWelcome] = useState('أهلاً بك! كيف أقدر أساعدك اليوم؟ يسعدني الإجابة عن أي استفسار.');
+  const [widgetColor, setWidgetColor] = useState('#10b981');
+  const [widgetPosition, setWidgetPosition] = useState<'right' | 'left'>('right');
+  const [copiedWidgetCode, setCopiedWidgetCode] = useState(false);
+  const [isWidgetTesting, setIsWidgetTesting] = useState(false);
 
   // Loading & notification states
   const [loading, setLoading] = useState(true);
@@ -110,6 +124,44 @@ export function ChannelsSettings() {
 
   const handleRemoveExcludedNumber = (num: string) => {
     setExcludedPhoneNumbers(excludedPhoneNumbers.filter((n) => n !== num));
+  };
+
+  const widgetSnippetCode = `<!-- OmniDesk AI Live Chat Widget -->\n` +
+`<script\n` +
+`  src="${apiUrl}/widget.js"\n` +
+`  data-tenant-id="${tenantId || 'tenant_default'}"\n` +
+`  data-api-url="${apiUrl}"\n` +
+`  data-title="${widgetTitle}"\n` +
+`  data-welcome="${widgetWelcome}"\n` +
+`  data-color="${widgetColor}"\n` +
+`  data-position="${widgetPosition}"\n` +
+`  defer>\n` +
+`</` + `script>`;
+
+  const handleCopyWidgetCode = () => {
+    navigator.clipboard.writeText(widgetSnippetCode);
+    setCopiedWidgetCode(true);
+    setTimeout(() => setCopiedWidgetCode(false), 3000);
+  };
+
+  const handleTestWidget = () => {
+    const existing = document.getElementById('omni-widget-container');
+    if (existing) {
+      const toggle = document.getElementById('omni-widget-toggle') as HTMLButtonElement;
+      if (toggle) toggle.click();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `${apiUrl}/widget.js`;
+    script.dataset.tenantId = tenantId || 'tenant_default';
+    script.dataset.apiUrl = apiUrl;
+    script.dataset.title = widgetTitle;
+    script.dataset.welcome = widgetWelcome;
+    script.dataset.color = widgetColor;
+    script.dataset.position = widgetPosition;
+    script.defer = true;
+    document.body.appendChild(script);
+    setIsWidgetTesting(true);
   };
 
   return (
@@ -439,6 +491,206 @@ export function ChannelsSettings() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* Web Chat Widget Section (Omnichannel Website Chatbot) */}
+      <section className="bg-slate-900/60 border border-slate-800/80 backdrop-blur rounded-2xl p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <Globe className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-100">
+                ودجت الدردشة للموقع الإلكتروني (Web Chatbot Widget)
+              </h3>
+              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+                متعدد القنوات (Omnichannel)
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">
+              انسخ كوداً واحداً وضعه في موقعك أو متجرك الإلكتروني (سلة، زد، شوبيفاي، ووردبريس، أو HTML) ليتحول لمساعد ذكي فوري يتحدث بنفس قواعد المعرفة، المنتجات، والمهارات!
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleTestWidget}
+            className="self-start sm:self-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-emerald-500/40 text-xs font-semibold transition"
+          >
+            <Eye className="w-4 h-4 text-emerald-400" />
+            <span>{isWidgetTesting ? 'فتح الودجت في الصفحة' : 'تجربة الودجت الآن مباشرة'}</span>
+          </button>
+        </div>
+
+        {/* Customization Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Controls */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+              <Palette className="w-4 h-4 text-emerald-400" />
+              <span>تخصيص المظهر والنصوص (Appearance & Behavior)</span>
+            </h4>
+
+            {/* Title */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">
+                اسم المساعد في رأس الودجت:
+              </label>
+              <input
+                type="text"
+                value={widgetTitle}
+                onChange={(e) => setWidgetTitle(e.target.value)}
+                placeholder="مساعد OmniDesk الذكي"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              />
+            </div>
+
+            {/* Welcome message */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">
+                رسالة الترحيب الأولى التلقائية:
+              </label>
+              <textarea
+                rows={2}
+                value={widgetWelcome}
+                onChange={(e) => setWidgetWelcome(e.target.value)}
+                placeholder="أهلاً بك! كيف يمكنني مساعدتك اليوم؟"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none"
+              />
+            </div>
+
+            {/* Colors & Position in two columns */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Color Picker */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                  اللون الأساسي (Primary Color):
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex items-center">
+                    <input
+                      type="color"
+                      value={widgetColor}
+                      onChange={(e) => setWidgetColor(e.target.value)}
+                      className="w-9 h-9 rounded-xl bg-transparent border-0 cursor-pointer p-0"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {['#10b981', '#6366f1', '#0ea5e9', '#8b5cf6', '#f43f5e', '#d97706'].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setWidgetColor(c)}
+                        style={{ backgroundColor: c }}
+                        className={`w-6 h-6 rounded-full border-2 transition ${
+                          widgetColor.toLowerCase() === c.toLowerCase()
+                            ? 'border-white scale-110 shadow-lg'
+                            : 'border-transparent opacity-80 hover:opacity-100'
+                        }`}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Position */}
+              <div>
+                <label className="block text-xs font-medium text-slate-400 mb-1.5">
+                  موضع الزر العائم في الصفحة:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWidgetPosition('right')}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition border ${
+                      widgetPosition === 'right'
+                        ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    أسفل اليمين (Right)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWidgetPosition('left')}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition border ${
+                      widgetPosition === 'left'
+                        ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    أسفل اليسار (Left)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Embed Code Snippet */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Code2 className="w-4 h-4 text-emerald-400" />
+                <span>كود التضمين للموقع (HTML Embed Code)</span>
+              </h4>
+              <button
+                type="button"
+                onClick={handleCopyWidgetCode}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  copiedWidgetCode
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30'
+                }`}
+              >
+                {copiedWidgetCode ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>تم النسخ!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>نسخ الكود</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Code Box */}
+            <div className="relative group">
+              <pre
+                dir="ltr"
+                className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-emerald-300 font-mono text-[11px] leading-relaxed overflow-x-auto select-all"
+              >
+                {widgetSnippetCode}
+              </pre>
+            </div>
+
+            {/* Integration Instructions */}
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80 space-y-2 text-[11px] text-slate-400">
+              <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                <Terminal className="w-3.5 h-3.5 text-slate-400" />
+                <span>أين أضع هذا الكود؟</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-slate-400 leading-relaxed pr-1">
+                <li>
+                  <strong className="text-slate-200">سلة (Salla) أو زد (Zid):</strong> إعدادات المتجر &gt; الأكواد المخصصة (Custom JS / Tracking Scripts).
+                </li>
+                <li>
+                  <strong className="text-slate-200">Shopify:</strong> Online Store &gt; Themes &gt; Edit code &gt; <code className="text-emerald-400 font-mono">theme.liquid</code> قبل وسم <code className="text-emerald-400 font-mono">&lt;/body&gt;</code>.
+                </li>
+                <li>
+                  <strong className="text-slate-200">WordPress / WooCommerce:</strong> عبر إضافة Header &amp; Footer Code أو في قالب الموقع.
+                </li>
+                <li>
+                  <strong className="text-slate-200">أي موقع HTML مخصص:</strong> الصق الكود مباشرة قبل وسم الإغلاق <code className="text-emerald-400 font-mono">&lt;/body&gt;</code>.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </section>
     </div>
   );

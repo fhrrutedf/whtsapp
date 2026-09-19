@@ -9,7 +9,8 @@ import {
   UploadCloud, 
   Check, 
   Sliders,
-  Sparkles
+  Sparkles,
+  Link2,
 } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore';
 
@@ -19,7 +20,9 @@ export function GeneralSettings() {
   const [brandTagline, setBrandTagline] = useState('منصة خدمة العملاء الذكية متعددة القنوات');
   const [supportEmail, setSupportEmail] = useState('support@omnidesk.ai');
   const [timezone, setTimezone] = useState('Asia/Riyadh');
-  const [currency, setCurrency] = useState('SAR');
+  const [currency, setCurrency] = useState('USD');
+  const [checkoutBaseUrl, setCheckoutBaseUrl] = useState('');
+
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -34,6 +37,7 @@ export function GeneralSettings() {
         if (data.supportEmail) setSupportEmail(data.supportEmail);
         if (data.timezone) setTimezone(data.timezone);
         if (data.currency) setCurrency(data.currency);
+        if (data.checkoutBaseUrl) setCheckoutBaseUrl(data.checkoutBaseUrl);
       })
       .catch(() => {});
   }, [apiUrl, tenantId]);
@@ -54,6 +58,7 @@ export function GeneralSettings() {
           supportEmail,
           timezone,
           currency,
+          checkoutBaseUrl,
         }),
       });
       setSavedSuccess(true);
@@ -204,6 +209,35 @@ export function GeneralSettings() {
                 <option value="EUR">يورو (EUR)</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Payment Link Card */}
+        <div className="p-6 rounded-3xl bg-slate-900/60 border border-white/[0.08] backdrop-blur-xl space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-emerald-400" />
+              <span>رابط الدفع المعتمد (Payment Link)</span>
+            </h3>
+            <span className="text-[11px] text-emerald-400 font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              رابط الدفع المباشر
+            </span>
+          </div>
+          <p className="text-xs text-slate-400">
+            ضع رابط الدفع الشامل الخاص بك هنا. عند طلب أي عميل للدفع، يرسل له الذكاء الاصطناعي هذا الرابط مباشرة وبسرعة.
+          </p>
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-2">
+              رابط الدفع:
+            </label>
+            <input
+              type="url"
+              placeholder="https://... رابط صفحة الدفع الخاصة بك"
+              value={checkoutBaseUrl}
+              onChange={(e) => setCheckoutBaseUrl(e.target.value)}
+              className="w-full bg-[#070b14] border border-white/[0.09] rounded-xl px-4 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-emerald-500/50"
+              dir="ltr"
+            />
           </div>
         </div>
 

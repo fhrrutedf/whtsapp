@@ -4,9 +4,11 @@ node_modules/
 
 # Production builds
 dist/
+!apps/widget/dist/
 build/
 .next/
 out/
+*.tsbuildinfo
 
 # Environment files
 .env

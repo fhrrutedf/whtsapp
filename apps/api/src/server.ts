@@ -58,6 +58,22 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 app.use('/media', express.static(UPLOADS_DIR));
 
+// Serve embeddable Web Chat Widget bundle at /widget and /widget.js
+const WIDGET_DIST = path.resolve(__dirname, '../../widget/dist');
+if (fs.existsSync(WIDGET_DIST)) {
+  app.use('/widget', express.static(WIDGET_DIST));
+  app.get('/widget.js', (_req: Request, res: Response) => {
+    const widgetScript = path.join(WIDGET_DIST, 'omni-widget.iife.js');
+    if (fs.existsSync(widgetScript)) {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.sendFile(widgetScript);
+    } else {
+      res.status(404).send('Widget script not found.');
+    }
+  });
+}
+
 
 // CRITICAL FOR META HMAC: Capture raw buffer before JSON parsing
 app.use(
@@ -1464,6 +1480,114 @@ app.get('/api/whatsapp/status', (req: Request, res: Response) => {
     connected: isConnected,
     phone: session?.user?.id?.split(':')[0]?.split('@')[0] ?? null,
   });
+});
+
+// ==============================================================================
+// Omnichannel Web Chat Widget Endpoint
+// ==============================================================================
+// POST /api/widget/chat  →  Process message from embeddable Web Chat Widget
+app.post('/api/widget/chat', async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req.headers['x-tenant-id'] as string) || req.body.tenantId || 'demo-tenant-1';
+    const { visitorId, message, history = [] } = req.body;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const cleanVisitorId = visitorId || `visitor_${Date.now()}`;
+    const convId = `conv_web_${cleanVisitorId}`;
+
+    // 1. Format conversation history for Gemini
+    const chatHistory: any[] = (Array.isArray(history) ? history : []).map((m: any) => ({
+      senderType: m.sender === 'visitor' ? 'CONTACT' : 'AGENT',
+      content: m.text || m.content || '',
+    }));
+
+    // Add latest user message if not already present
+    if (!chatHistory.length || chatHistory[chatHistory.length - 1].content !== message) {
+      chatHistory.push({
+        senderType: 'CONTACT',
+        content: message.trim(),
+      });
+    }
+
+    // 2. Generate Smart Reply using unified AI Service (SAME Knowledge Base, Dialect, Skills, Tone!)
+    const aiReply = await GeminiService.generateSmartReply(
+      tenantId,
+      chatHistory,
+      undefined,
+      undefined,
+      undefined,
+      cleanVisitorId
+    );
+
+    const cleaned = GeminiService.cleanTextForHumanWhatsApp(aiReply);
+    const bubbles = GeminiService.splitIntoNaturalBubbles(cleaned, 3);
+
+    // 3. Persist in localStore so it appears in real-time in the Dashboard!
+    const contactName = `زائر ويب (${cleanVisitorId.slice(-4)})`;
+    const storedContact = localStore.upsertContact(tenantId, `web:${cleanVisitorId}`, contactName);
+
+    // Save visitor message
+    localStore.saveMessage({
+      id: `web_msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      tenantId,
+      conversationId: convId,
+      senderType: 'CONTACT',
+      senderId: cleanVisitorId,
+      senderName: contactName,
+      content: message.trim(),
+      deliveryStatus: 'READ',
+      createdAt: new Date().toISOString(),
+    });
+
+    // Save bot reply
+    const botMsgId = `web_reply_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    localStore.saveMessage({
+      id: botMsgId,
+      tenantId,
+      conversationId: convId,
+      senderType: 'AGENT',
+      senderId: 'gemini-ai',
+      senderName: 'مساعد الذكاء الاصطناعي',
+      content: cleaned,
+      deliveryStatus: 'SENT',
+      createdAt: new Date().toISOString(),
+    });
+
+    localStore.upsertConversation(convId, tenantId, storedContact, cleaned, false);
+
+    // Notify Dashboard via Socket.io
+    const io = getSocketGateway();
+    if (io) {
+      io.to(`tenant:${tenantId}`).emit('message:new', {
+        message: {
+          id: botMsgId,
+          tenantId,
+          conversationId: convId,
+          senderType: 'AGENT',
+          senderId: 'gemini-ai',
+          senderName: 'مساعد الذكاء الاصطناعي',
+          content: cleaned,
+          deliveryStatus: 'SENT',
+          createdAt: new Date().toISOString(),
+          isTemplate: false,
+          templateName: null,
+          metaMessageId: botMsgId,
+        } as any,
+      });
+    }
+
+    res.json({
+      reply: cleaned,
+      bubbles,
+      visitorId: cleanVisitorId,
+    });
+  } catch (err: any) {
+    console.error('[WidgetChat] Error handling widget message:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to process widget message' });
+  }
 });
 
 
